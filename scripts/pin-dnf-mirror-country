@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Pin DNF mirrors with country codes
+
+set -e
+
+# Validate all country codes
+COUNTRIES=()
+for COUNTRY in "$@"; do
+    if ! [[ "${COUNTRY}" =~ ^[A-Z]{2}$ ]]; then
+        echo "Invalid country code: ${COUNTRY}"
+        echo "Country code must be exactly 2 uppercase letters (ISO 3166-1 Alpha-2)"
+        echo "Example: US NL DE"
+        exit 1
+    fi
+    COUNTRIES+=("${COUNTRY}")
+done
+
+# Check if at least one country code was provided
+if [ ${#COUNTRIES[@]} -eq 0 ]; then
+    echo "Error: At least one country code must be provided"
+    echo "Usage: $0 COUNTRY_CODE [COUNTRY_CODE ...]"
+    echo "Example: $0 US NL DE"
+    exit 1
+fi
+
+# Join country codes with commas
+COUNTRY_LIST=$(IFS=,; echo "${COUNTRIES[*]}")
+
+DNF_REPO_DIR="/etc/yum.repos.d"
+DNF_REPO_BACKUP_DIR="${DNF_REPO_DIR}.backup"
+
+# Backup DNF_REPO_DIR if backup doesn't exist
+if [ ! -d "${DNF_REPO_BACKUP_DIR}" ]; then
+    cp -r "${DNF_REPO_DIR}" "${DNF_REPO_BACKUP_DIR}"
+else
+    echo "Backup already exists at ${DNF_REPO_BACKUP_DIR}. Skipping..."
+fi
+
+sed -i "s|^metalink=.*|&\&country=${COUNTRY_LIST}|" ${DNF_REPO_DIR}/*.repo
+
+echo "Refreshing DNF cache..."
+dnf makecache --refresh
+
+echo "Cleaning DNF metadata..."
+dnf clean metadata
+
+echo "Updating DNF repo info..."
+dnf repo info updates

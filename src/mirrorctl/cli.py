@@ -1,0 +1,178 @@
+import re
+from enum import Enum
+from textwrap import dedent
+from typing import Annotated, Callable
+
+import click
+import distro
+import pydantic
+import typer
+from pydantic import AnyUrl
+
+from mirrorctl.data.fedora import FEDORA_REPO_GROUP
+from mirrorctl.data.rpmfusion_free import RPMFUSION_FREE_REPO_GROUP
+from mirrorctl.data.rpmfusion_nonfree import RPMFUSION_NONFREE_REPO_GROUP
+from mirrorctl.operations import set_baseurl, set_metalink
+from mirrorctl.types import RepoGroup
+from mirrorctl.utils import is_rpm_free_installed, is_rpm_nonfree_installed
+
+_DISTRO_REPO_MAP: dict[str, RepoGroup] = {
+    "fedora": FEDORA_REPO_GROUP,
+}
+
+
+class ExternalGroup(str, Enum):
+    RPMFUSION_FREE = "rpmfusion-free"
+    RPMFUSION_NONFREE = "rpmfusion-nonfree"
+
+
+_EXTERNAL_GROUP_REPO_MAP: dict[ExternalGroup, tuple[RepoGroup, Callable[[], bool]]] = {
+    ExternalGroup.RPMFUSION_FREE: (RPMFUSION_FREE_REPO_GROUP, is_rpm_free_installed),
+    ExternalGroup.RPMFUSION_NONFREE: (
+        RPMFUSION_NONFREE_REPO_GROUP,
+        is_rpm_nonfree_installed,
+    ),
+}
+
+
+def _exit_with_error(message: str) -> None:
+    typer.echo(f"Error: {message}", err=True)
+    raise typer.Exit(1)
+
+
+def get_repo_group(
+    group: str | None = None,
+) -> RepoGroup:
+    if group is None:
+        # Default to system's repo
+        distro_id = distro.id()
+        if distro_id not in _DISTRO_REPO_MAP:
+            _exit_with_error(f"Not supported distro: {distro_id}")
+
+        return _DISTRO_REPO_MAP[distro_id]
+
+    # Use specified external group
+    if group not in _EXTERNAL_GROUP_REPO_MAP:
+        _exit_with_error(f"Unknown group: {group}")
+
+    repo_group, check_func = _EXTERNAL_GROUP_REPO_MAP[ExternalGroup(group)]
+    if not check_func():
+        # TODO: better error message
+        _exit_with_error("rpmfusion is not installed.")
+
+    return repo_group
+
+
+app = typer.Typer(help="Manage repository mirrors", no_args_is_help=True)
+
+
+class AnyUrlTypeParser(click.ParamType):
+    name = "AnyUrl"
+
+    def convert(
+        self, value: str, param: click.Parameter | None, ctx: click.Context | None
+    ) -> AnyUrl:
+        try:
+            return AnyUrl(value)
+        except pydantic.ValidationError:
+            self.fail(f"Invalid URL: {value}", param, ctx)
+
+
+def _validate_country_codes(value: list[str]) -> list[str]:
+    for country_code in value:
+        if not re.match("^[A-Za-z]{2}$", country_code):
+            _exit_with_error(
+                f"Invalid country code: {country_code}. "
+                "Country code must be exactly 2 uppercase letters (ISO 3166-1 Alpha-2)"
+            )
+
+    return value
+
+
+@app.command("auto-mirrors", help="Auto-select mirrors for repositories")
+def auto_mirrors(
+    country: Annotated[
+        list[str] | None,
+        typer.Option(
+            help=(
+                "ISO 3166-1 Alpha-2 country codes to prefer (space-separated). "
+                "Note: if mirrors are not available in the specified countries, "
+                "the server will choose closest available ones. If you don't want this,"
+                "pin mirrors using 'use-baseurl' command."
+            ),
+            callback=_validate_country_codes,
+        ),
+    ] = None,
+    protocol: Annotated[
+        list[str] | None,
+        typer.Option(
+            help=(
+                "Protocols to prefer (space-separated, e.g., --protocol https http). "
+                "Note: if there's no mirrors available with the specified protocols, "
+                "the server will choose closest available ones. "
+                "If you don't want this, pin mirrors using 'pin-mirrors' command."
+            ),
+        ),
+    ] = None,
+    group: Annotated[
+        ExternalGroup | None,
+        typer.Option(
+            help="Repository group to apply changes to. "
+            "If not provided, defaults to system's repo group",
+        ),
+    ] = None,
+) -> None:
+    repo_group = get_repo_group(group=group)
+    set_metalink(
+        repo_group,
+        country=country,
+        protocol=protocol,
+    )
+    _print_success_message()
+
+
+@app.command("pin-mirrors", help="Pin mirrors for repositories")
+def pin_mirrors(
+    urls: Annotated[
+        list[AnyUrl],
+        typer.Argument(
+            help=(
+                "Mirror URLs to use (space-separated). "
+                "Copy & paste exact urls from the mirrost list website."
+            ),
+            click_type=AnyUrlTypeParser(),
+        ),
+    ],
+    group: Annotated[
+        ExternalGroup | None,
+        typer.Option(
+            help="Extra repository group to apply changes to. "
+            "If not provided, defaults to system's repo group",
+        ),
+    ] = None,
+) -> None:
+    if len(urls) == 0:
+        raise typer.BadParameter(
+            "At least one mirror URL must be provided for use-baseurl"
+        )
+
+    repo_group = get_repo_group(group=group)
+    set_baseurl(repo_group, urls)
+    _print_success_message()
+
+
+def _print_success_message() -> None:
+    print(
+        dedent("""
+        --------------------------
+        Changes made successfully!
+
+        Steps you must take:
+        1. Check config at /etc/dnf/repos.override.d/99-config_manager.repo
+        2. Apply config by running `dnf clean all && dnf repo info --all`
+        """)
+    )
+
+
+if __name__ == "__main__":
+    app()

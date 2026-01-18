@@ -1,0 +1,52 @@
+from mirrorctl.types import RepoData, RepoGroup
+
+RPMFUSION_FREE_REPO_GROUP = RepoGroup(
+    metalink_base_url="https://mirrors.rpmfusion.org",
+    repo_data_list=[
+        RepoData(
+            repo_id="rpmfusion-free-updates-testing",
+            baseurl_path="/free/fedora/updates/testing/$releasever/$basearch/",
+            metalink_repo_id="free-fedora-updates-testing-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free-updates-testing-debuginfo",
+            baseurl_path="/free/fedora/updates/testing/$releasever/$basearch/debug/",
+            metalink_repo_id="free-fedora-updates-testing-debug-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free-updates-testing-source",
+            baseurl_path="/free/fedora/updates/testing/$releasever/SRPMS/",
+            metalink_repo_id="free-fedora-updates-testing-source-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free-updates",
+            baseurl_path="/free/fedora/updates/$releasever/$basearch/",
+            metalink_repo_id="free-fedora-updates-released-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free-updates-debuginfo",
+            baseurl_path="/free/fedora/updates/$releasever/$basearch/debug/",
+            metalink_repo_id="free-fedora-updates-released-debug-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free-updates-source",
+            baseurl_path="/free/fedora/updates/$releasever/SRPMS/",
+            metalink_repo_id="free-fedora-updates-released-source-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free",
+            baseurl_path="/free/fedora/releases/$releasever/Everything/$basearch/os/",
+            metalink_repo_id="free-fedora-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free-debuginfo",
+            baseurl_path="/free/fedora/releases/$releasever/Everything/$basearch/debug/",
+            metalink_repo_id="free-fedora-debug-$releasever",
+        ),
+        RepoData(
+            repo_id="rpmfusion-free-source",
+            baseurl_path="/free/fedora/releases/$releasever/Everything/source/SRPMS/",
+            metalink_repo_id="free-fedora-source-$releasever",
+        ),
+    ],
+)

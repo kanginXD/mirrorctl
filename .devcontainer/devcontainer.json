@@ -1,0 +1,24 @@
+{
+	"name": "dnf-config-mirror dev container",
+	"build": {
+		"dockerfile": "./Containerfile",
+		"context": "..",
+		"args": {
+			"ARG_DNF_MIRROR_COUNTRY": "${localEnv:DEV_DNF_MIRROR_PIN_COUNTRY}"
+		}
+	},
+	"remoteUser": "dev",
+	"remoteEnv": {
+		"UV_LINK_MODE": "copy"
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"charliermarsh.ruff",
+				"meta.pyrefly"
+			]
+		}
+	},
+	"postCreateCommand": "uv sync --link-mode=copy",
+    "postStartCommand": "uv run pre-commit install"
+}

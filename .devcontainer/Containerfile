@@ -1,0 +1,77 @@
+FROM fedora:43
+
+# -----------------------------------------------------------------------------
+# Args
+
+ARG ARG_DNF_MIRROR_COUNTRY
+
+ARG ARG_USER_NAME=dev
+ARG ARG_USER_GROUP_NAME=${ARG_USER_NAME}
+
+ARG ARG_USER_UID=1001
+ARG ARG_USER_GID=${ARG_USER_UID}
+
+# -----------------------------------------------------------------------------
+# Envs
+
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+
+# -----------------------------------------------------------------------------
+# Prepare DNF Mirrors
+
+COPY scripts/pin-dnf-mirror-country /usr/local/bin/pin-dnf-mirror-country
+RUN if [ -n "${ARG_DNF_MIRROR_COUNTRY}" ]; then \
+    pin-dnf-mirror-country ${ARG_DNF_MIRROR_COUNTRY}; \
+fi
+
+# -----------------------------------------------------------------------------
+# Install essential packages
+RUN dnf update && dnf install -y \
+    #
+    # Basic utilities
+    wget curl git vim nano sudo zsh tree netcat \
+    glibc-common glibc-langpack-en glibc-locale-source
+
+# Set locale
+RUN echo "LANG=en_US.UTF-8" > /etc/locale.conf \
+    # DO NOT USE `--verbose` OPTION. Build will fail.
+    # See: https://stackoverflow.com/a/30757145
+    && localedef --force -i en_US -f UTF-8 en_US.UTF-8
+
+# --------------------------------------------------------------------------- #
+# Add user: ${ARG_USER_NAME}
+
+# Add user
+RUN groupadd --gid ${ARG_USER_GID} ${ARG_USER_GROUP_NAME} \
+    && useradd -s /bin/zsh --uid ${ARG_USER_UID} --gid ${ARG_USER_GID} -m ${ARG_USER_NAME}
+
+# Add user to sudoers
+RUN usermod -aG wheel ${ARG_USER_NAME} \
+    && echo "${ARG_USER_NAME} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${ARG_USER_NAME} \
+    && chmod 0440 /etc/sudoers.d/${ARG_USER_NAME}
+
+# Ensure home directory is user-owned
+RUN chown -R ${ARG_USER_UID}:${ARG_USER_GID} ${HOME} \
+    && chmod -R 700 ${HOME}
+
+# #############################################################################
+# FROM HERE: User-specific actions
+# These commands are intended for the user: ${ARG_USER_NAME}.
+# Note: 'sudo' required for privileged operations.
+
+USER ${ARG_USER_NAME}
+
+# --------------------------------------------------------------------------- #
+# Install Zsh with oh-my-zsh & plugins
+# https://github.com/deluan/zsh-in-docker
+
+RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.1/zsh-in-docker.sh)" -- \
+    -x \
+    -t fino \
+    -p git \
+    -p ssh-agent
+
+# -----------------------------------------------------------------------------
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh

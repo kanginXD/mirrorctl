@@ -1,0 +1,30 @@
+repos:
+- hooks:
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+  - id: check-case-conflict
+  - id: check-illegal-windows-names
+  - id: check-merge-conflict
+  repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+- hooks:
+  - args:
+    - --fix
+    id: ruff-check
+  - id: ruff-format
+  repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.14.9
+- hooks:
+  - id: pyrefly-check
+    language: system
+    name: Pyrefly (type checking)
+    pass_filenames: false
+  repo: https://github.com/facebook/pyrefly-pre-commit
+  rev: 0.46.0
+- hooks:
+  - id: commitizen
+  - id: commitizen-branch
+    stages:
+    - pre-push
+  repo: https://github.com/commitizen-tools/commitizen
+  rev: v4.11.6

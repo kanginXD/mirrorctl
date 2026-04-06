@@ -76,7 +76,7 @@ _GROUP_OPTION_HELP = (
 )
 
 _APP_HELP = (
-    "Change DNF mirrors in a simple way. "
+    "Change DNF 4/5 mirrors in a simple way. "
     "All changes are written to /etc/dnf/repos.override.d/999-mirrorctl.repo. "
     "Fedora and RPM Fusion use different mirror pools; "
     "for add-ons such as RPM Fusion, use --group."
@@ -113,14 +113,13 @@ def _validate_country_codes(value: list[str] | None) -> list[str] | None:
 
 
 @app.command(
-    "auto-mirrors",
+    "auto",
     help=(
-        "Mirrors are chosen for you automatically (GeoIP based). "
-        "You can say which countries or protocol (http/https/rsync) you prefer; "
-        "those are only hints and another mirror may still be picked. "
-        "Unless --no-check is set, the metalink is fetched and country/protocol "
-        "choices are checked against it (needs network). "
-        "To use only the mirrors you choose, use `pin-mirrors`."
+        "Let DNF pick mirrors automatically (metalink / GeoIP). "
+        "Optional country and protocol flags are hints only. "
+        "Unless --no-check is set, the metalink is fetched and preferences "
+        "are checked against it (needs network). "
+        "For a fixed mirror list, use `pin-mirrors`."
     ),
 )
 def auto_mirrors(
@@ -180,7 +179,7 @@ def auto_mirrors(
 
 @app.command(
     "pin-mirrors",
-    help="Use only the mirror addresses you list (fixed list).",
+    help="Use only the mirror base URLs you list (fixed list).",
 )
 def pin_mirrors(
     urls: Annotated[
@@ -245,11 +244,8 @@ def pin_mirrors(
 
 
 @app.command(
-    "official-only",
-    help=(
-        "Download only from the official project sites, "
-        "not from volunteer mirror networks."
-    ),
+    "official",
+    help=("Use only the main repository sites, not volunteer mirror networks."),
 )
 def official_only(
     group: Annotated[
@@ -263,20 +259,20 @@ def official_only(
 
 
 @app.command(
-    "unset-all-mirrors",
+    "block-all-mirrors",
     help=(
-        "Write empty mirror overrides for every repo mirrorctl manages to block "
-        "DNF automatic mirror selection."
+        "Write empty mirror overrides for repos mirrorctl manages so DNF cannot "
+        "auto-pick mirrors (you must set mirrors explicitly)."
     ),
 )
 def unset_all_mirrors_command() -> None:
     override_file = unset_all_mirrors(MANAGED_REPO_GROUPS)
-    _print_success_message(override_file)
+    typer.echo(f"Wrote empty mirror overrides on {override_file}")
 
 
 @app.command(
-    "reset",
-    help="Delete mirrorctl override file.",
+    "remove-overrides",
+    help="Remove mirrorctl's override file under /etc/dnf/repos.override.d/.",
 )
 def reset_command() -> None:
     override_file = reset_overrides()
@@ -284,10 +280,10 @@ def reset_command() -> None:
 
 
 @app.command(
-    "refresh-cache",
+    "refresh-dnf",
     help=(
         "Run `dnf clean all` then `dnf makecache --refresh` "
-        "(same as after changing overrides; use sudo if required on your system)."
+        "(pick up repo changes; use sudo if required on your system)."
     ),
 )
 def refresh_cache() -> None:
@@ -309,7 +305,7 @@ def refresh_cache() -> None:
 
 def _print_success_message(override_file: Path) -> None:
     notice = (
-        "IMPORTANT: Refresh metadata, e.g. `sudo mirrorctl refresh-cache` "
+        "IMPORTANT: Refresh metadata, e.g. `mirrorctl refresh-dnf` "
         "or `dnf clean all && dnf makecache --refresh`."
     )
     typer.echo(f"Wrote DNF repo overrides on {override_file}\n\n")

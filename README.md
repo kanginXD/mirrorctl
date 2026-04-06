@@ -14,7 +14,7 @@ Control DNF 4/5 mirrors with simple commands.
   - RPM Fusion free (`rpmfusion-free`)
   - RPM Fusion nonfree (`rpmfusion-nonfree`)
 - One override file: `/etc/dnf/repos.override.d/999-mirrorctl.repo`
-- Undo in one step: `mirrorctl reset`
+- Undo in one step: `mirrorctl remove-overrides`
 
 ## Install
 
@@ -30,29 +30,29 @@ mirrorctl --help
 
 ## Commands
 
-### Auto mirrors (GeoIP-based auto selection)
+### `auto` — automatic mirror selection (metalink / GeoIP)
 
 ```bash
-# default (GeoIP)
-sudo mirrorctl auto-mirrors
+# default
+sudo mirrorctl auto
 
 # prefer countries
-sudo mirrorctl auto-mirrors --country KR --country US
+sudo mirrorctl auto --country KR --country US
 
 # prefer protocols
-sudo mirrorctl auto-mirrors --protocol https --protocol rsync
+sudo mirrorctl auto --protocol https --protocol rsync
 
 # skip availability check
-sudo mirrorctl auto-mirrors --country KR --protocol https --no-check
+sudo mirrorctl auto --country KR --protocol https --no-check
 ```
 
 - `--country` and `--protocol` are only preferences; another mirror can still
-  win. Use `pin-mirrors` instead to ensure specific mirrors are used.
+  win. Use `pin-mirrors` instead to pin exact base URLs.
 - Country codes: [ISO 3166-1 Alpha-2 (two letters)](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Officially_assigned_code_elements); repeat `--country` for each.
 - When `--country` or `--protocol` is set, mirror availability is checked before
   write (skip with `--no-check`).
 
-### Pin exact mirrors
+### `pin-mirrors` — fixed mirror URLs
 
 Use either `--url` (repeat for multiple) or `--file`, not both.
 
@@ -79,31 +79,31 @@ https://download-ib01.fedoraproject.org/pub/fedora/linux
 sudo mirrorctl pin-mirrors --file ./mirrors.txt
 ```
 
-### Official-only (disable mirror networks)
+### `official` — official sites only (no mirror network)
 
 Run once per group you want to apply:
 
 ```bash
-sudo mirrorctl official-only
-sudo mirrorctl official-only --group rpmfusion-free
-sudo mirrorctl official-only --group rpmfusion-nonfree
+sudo mirrorctl official
+sudo mirrorctl official --group rpmfusion-free
+sudo mirrorctl official --group rpmfusion-nonfree
 ```
 
-### Block automatic mirror selection for all managed groups
+### `block-all-mirrors` — block DNF auto mirror picks
 
-Blocks DNF automatic mirror selection for mirrorctl-managed repos; nudges the
-user toward explicit mirror setup.
+Writes empty mirror overrides for mirrorctl-managed repos so DNF cannot
+auto-select mirrors; you configure mirrors explicitly afterward.
 
 ```bash
-sudo mirrorctl unset-all-mirrors
+sudo mirrorctl block-all-mirrors
 ```
 
-### Reset mirrorctl override
+### `remove-overrides` — drop mirrorctl’s override file
 
-Undo mirrorctl's own override (`/etc/dnf/repos.override.d/999-mirrorctl.repo`).
+Removes `/etc/dnf/repos.override.d/999-mirrorctl.repo`.
 
 ```bash
-sudo mirrorctl reset
+sudo mirrorctl remove-overrides
 ```
 
 ### The `--group` option
@@ -119,20 +119,20 @@ metalink server and paths). Without `--group`, only the OS bundle is updated;
 RPM Fusion repos are left unchanged until you run the same command again with
 the right `--group`.
 
-Supported on: `auto-mirrors`, `pin-mirrors`, `official-only`.
+Supported on: `auto`, `pin-mirrors`, `official`.
 
 ```bash
-sudo mirrorctl auto-mirrors --group rpmfusion-free
+sudo mirrorctl auto --group rpmfusion-free
 sudo mirrorctl pin-mirrors --url https://download1.rpmfusion.org --group rpmfusion-free
-sudo mirrorctl official-only --group rpmfusion-nonfree
+sudo mirrorctl official --group rpmfusion-nonfree
 ```
 
-### After any command
+### After changing overrides
 
-DNF must refresh cached repo metadata to pick up the new override file.
+DNF should refresh cached repo metadata to pick up the new override file.
 
 ```bash
-sudo mirrorctl refresh-cache
+sudo mirrorctl refresh-dnf
 ```
 
 Or manually:

@@ -97,7 +97,10 @@ class AnyUrlTypeParser(click.ParamType):
             self.fail(f"Invalid URL: {value}", param, ctx)
 
 
-def _validate_country_codes(value: list[str]) -> list[str]:
+def _validate_country_codes(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+
     for country_code in value:
         if not re.match("^[A-Za-z]{2}$", country_code):
             _exit_with_error(

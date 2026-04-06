@@ -1,13 +1,36 @@
 """Tests for mirrorctl CLI commands."""
 
+from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from mirrorctl.cli import app
+from mirrorctl.data.fedora import FEDORA_REPO_GROUP
 
 runner = CliRunner()
+
+
+@patch("mirrorctl.cli.set_metalink")
+@patch("mirrorctl.cli.get_repo_group")
+def test_auto_mirrors_no_options(
+    mock_get_repo_group: MagicMock,
+    mock_set_metalink: MagicMock,
+) -> None:
+    mock_get_repo_group.return_value = FEDORA_REPO_GROUP
+    mock_set_metalink.return_value = Path(
+        "/etc/dnf/repos.override.d/999-mirrorctl.repo"
+    )
+
+    result = runner.invoke(app, ["auto-mirrors"])
+
+    assert result.exit_code == 0
+    mock_set_metalink.assert_called_once_with(
+        FEDORA_REPO_GROUP,
+        country=None,
+        protocol=None,
+    )
 
 
 @patch("mirrorctl.cli.subprocess.run")

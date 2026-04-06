@@ -1,6 +1,4 @@
-from typing import Literal
-
-from pydantic import AnyUrl, BaseModel
+from pydantic import AnyUrl, BaseModel, field_validator
 
 
 class RepoData(BaseModel):
@@ -14,5 +12,10 @@ class RepoGroup(BaseModel):
     metalink_base_url: AnyUrl
     repo_data_list: list[RepoData]
 
+    @field_validator("repo_data_list")
+    @classmethod
+    def check_non_empty(cls, v: list[RepoData]) -> list[RepoData]:
+        if len(v) == 0:
+            raise ValueError("repo_data_list must not be empty")
 
-MirrorProtocol = Literal["https", "http", "rsync"]
+        return v

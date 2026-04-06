@@ -6,47 +6,47 @@ RPMFUSION_NONFREE_REPO_GROUP = RepoGroup(
     repo_data_list=[
         RepoData(
             repo_id="rpmfusion-nonfree-updates-testing",
-            baseurl_path="/updates/testing/$releasever/$basearch/",
+            baseurl_path="/nonfree/fedora/updates/testing/$releasever/$basearch/",
             metalink_repo_id="nonfree-fedora-updates-testing-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree-updates-testing-debuginfo",
-            baseurl_path="/updates/testing/$releasever/$basearch/debug/",
+            baseurl_path="/nonfree/fedora/updates/testing/$releasever/$basearch/debug/",
             metalink_repo_id="nonfree-fedora-updates-testing-debug-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree-updates-testing-source",
-            baseurl_path="/updates/testing/$releasever/SRPMS/",
+            baseurl_path="/nonfree/fedora/updates/testing/$releasever/SRPMS/",
             metalink_repo_id="nonfree-fedora-updates-testing-source-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree-updates",
-            baseurl_path="/updates/$releasever/$basearch/",
+            baseurl_path="/nonfree/fedora/updates/$releasever/$basearch/",
             metalink_repo_id="nonfree-fedora-updates-released-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree-updates-debuginfo",
-            baseurl_path="/updates/$releasever/$basearch/debug/",
+            baseurl_path="/nonfree/fedora/updates/$releasever/$basearch/debug/",
             metalink_repo_id="nonfree-fedora-updates-released-debug-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree-updates-source",
-            baseurl_path="/updates/$releasever/SRPMS/",
+            baseurl_path="/nonfree/fedora/updates/$releasever/SRPMS/",
             metalink_repo_id="nonfree-fedora-updates-released-source-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree",
-            baseurl_path="/releases/$releasever/Everything/$basearch/os/",
+            baseurl_path="/nonfree/fedora/releases/$releasever/Everything/$basearch/os/",
             metalink_repo_id="nonfree-fedora-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree-debuginfo",
-            baseurl_path="/releases/$releasever/Everything/$basearch/debug/",
+            baseurl_path="/nonfree/fedora/releases/$releasever/Everything/$basearch/debug/",
             metalink_repo_id="nonfree-fedora-debug-$releasever",
         ),
         RepoData(
             repo_id="rpmfusion-nonfree-source",
-            baseurl_path="/releases/$releasever/Everything/source/SRPMS/",
+            baseurl_path="/nonfree/fedora/releases/$releasever/Everything/source/SRPMS/",
             metalink_repo_id="nonfree-fedora-source-$releasever",
         ),
     ],

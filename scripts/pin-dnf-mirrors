@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+#
+# Usage: pin-dnf-mirrors MIRRORS_FILE
+#
+# Build /etc/dnf/repos.override.d/default_override.repo from yum.repos.d.
+# Reads each .repo under /etc/yum.repos.d, keeps only commented #baseurl=
+# templates (sections without one are skipped),
+# substitutes mirror roots from MIRRORS_FILE, and writes a single override.
+
+set -e
+
+MIRRORS_FILE="$1"
+
+if [ -z "${MIRRORS_FILE}" ] || [ ! -f "${MIRRORS_FILE}" ]; then
+    echo "Error: Mirror list file not found: ${MIRRORS_FILE}"
+    echo "Usage: $0 MIRRORS_FILE"
+    exit 1
+fi
+
+MIRRORS=()
+while IFS= read -r line || [ -n "$line" ]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    line="${line%/}"
+    if [ -n "$line" ]; then
+        MIRRORS+=("$line")
+    fi
+done < "${MIRRORS_FILE}"
+
+if [ ${#MIRRORS[@]} -eq 0 ]; then
+    echo "No mirror URLs in ${MIRRORS_FILE}, skipping mirror pinning."
+    exit 0
+fi
+
+DNF_REPO_DIR="/etc/yum.repos.d"
+OVERRIDE_DIR="/etc/dnf/repos.override.d"
+OVERRIDE_FILE="${OVERRIDE_DIR}/default_override.repo"
+
+PLACEHOLDER_HTTPS="https://download.example/pub/fedora/linux"
+PLACEHOLDER_HTTP="http://download.example/pub/fedora/linux"
+
+expand_baseurl_template() {
+    local template="$1"
+    local out=""
+    local first=true
+    local m expanded
+
+    for m in "${MIRRORS[@]}"; do
+        expanded="${template//${PLACEHOLDER_HTTPS}/${m}}"
+        expanded="${expanded//${PLACEHOLDER_HTTP}/${m}}"
+
+        if [ "$first" = true ]; then
+            out="baseurl=${expanded}"
+            first=false
+        else
+            out+=$'\n\t'"${expanded}"
+        fi
+    done
+
+    printf '%s\n' "$out"
+}
+
+flush_section() {
+    local section="$1"
+    local baseurl_template="$2"
+
+    if [ -z "${section}" ] || [ -z "${baseurl_template}" ]; then
+        return 0
+    fi
+
+    echo "${section}" >> "${TMP_OUT}"
+    expand_baseurl_template "${baseurl_template}" >> "${TMP_OUT}"
+    echo "metalink=" >> "${TMP_OUT}"
+    echo "" >> "${TMP_OUT}"
+}
+
+TMP_OUT="$(mktemp)"
+trap 'rm -f "${TMP_OUT}"' EXIT
+
+for repofile in "${DNF_REPO_DIR}"/*.repo; do
+    [ -f "${repofile}" ] || continue
+
+    section=""
+    baseurl_template=""
+
+    while IFS= read -r raw || [ -n "$raw" ]; do
+        line="${raw#"${raw%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+
+        if [[ "${line}" =~ ^\[[^]]+\]$ ]]; then
+            flush_section "${section}" "${baseurl_template}"
+            section="${line}"
+            baseurl_template=""
+            continue
+        fi
+
+        if [[ "${line}" =~ ^#[[:space:]]*[Bb]aseurl=(.+)$ ]]; then
+            baseurl_template="${BASH_REMATCH[1]}"
+            continue
+        fi
+    done < "${repofile}"
+
+    flush_section "${section}" "${baseurl_template}"
+done
+
+mkdir -p "${OVERRIDE_DIR}"
+mv "${TMP_OUT}" "${OVERRIDE_FILE}"
+trap - EXIT
+
+echo "Wrote ${OVERRIDE_FILE} (${#MIRRORS[@]} mirror(s) per repo)."
+
+echo "Refreshing DNF cache..."
+dnf makecache --refresh

@@ -3,8 +3,6 @@ FROM fedora:43
 # -----------------------------------------------------------------------------
 # Args
 
-ARG ARG_DNF_MIRROR_COUNTRY
-
 ARG ARG_USER_NAME=dev
 ARG ARG_USER_GROUP_NAME=${ARG_USER_NAME}
 
@@ -20,10 +18,10 @@ ENV LANG=en_US.UTF-8
 # -----------------------------------------------------------------------------
 # Prepare DNF Mirrors
 
-COPY scripts/pin-dnf-mirror-country /usr/local/bin/pin-dnf-mirror-country
-RUN if [ -n "${ARG_DNF_MIRROR_COUNTRY}" ]; then \
-    pin-dnf-mirror-country ${ARG_DNF_MIRROR_COUNTRY}; \
-fi
+RUN mkdir -p /usr/local/etc
+COPY scripts/pin-dnf-mirrors /usr/local/bin/pin-dnf-mirrors
+COPY .devcontainer/mirrors.txt /usr/local/etc/mirrors.txt
+RUN pin-dnf-mirrors /usr/local/etc/mirrors.txt
 
 # -----------------------------------------------------------------------------
 # Install essential packages

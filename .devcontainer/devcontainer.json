@@ -2,10 +2,7 @@
 	"name": "mirrorctl dev container",
 	"build": {
 		"dockerfile": "./Containerfile",
-		"context": "..",
-		"args": {
-			"ARG_DNF_MIRROR_COUNTRY": "${localEnv:DEV_DNF_MIRROR_PIN_COUNTRY}"
-		}
+		"context": ".."
 	},
 	"remoteUser": "dev",
 	"remoteEnv": {
@@ -14,6 +11,7 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
+				"esbenp.prettier-vscode",
 				"charliermarsh.ruff",
 				"meta.pyrefly"
 			]

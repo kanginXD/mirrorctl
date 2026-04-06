@@ -1,4 +1,5 @@
 import configparser
+import sys
 from pathlib import Path
 
 from pydantic import AnyUrl
@@ -39,9 +40,18 @@ def _merge_and_write(
         for key, value in new_config.items(section):
             merged.set(section, key, value)
 
-    OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with OVERRIDE_FILE.open("w") as f:
-        merged.write(f, space_around_delimiters=False)
+    try:
+        OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with OVERRIDE_FILE.open("w") as f:
+            merged.write(f, space_around_delimiters=False)
+
+    except PermissionError:
+        print(
+            f"Error: Permission denied writing to {OVERRIDE_FILE}\n"
+            "Try running with sudo.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
     return OVERRIDE_FILE
 
@@ -62,9 +72,7 @@ def metalink_builder(
     if protocol:
         query_params["protocol"] = ",".join(protocol)
 
-    query_string = "&".join(
-        [f"{key}={value}" for key, value in query_params.items()]
-    )
+    query_string = "&".join([f"{key}={value}" for key, value in query_params.items()])
 
     return join_url(metalink_base, f"/metalink?{query_string}")
 
@@ -78,9 +86,7 @@ def build_full_baseurl_list(
     full_baseurl_list: list[AnyUrl] = []
 
     for url in mirror_urls:
-        full_baseurl = AnyUrl(
-            str(url).removesuffix("/") + repo_data.baseurl_path
-        )
+        full_baseurl = AnyUrl(str(url).removesuffix("/") + repo_data.baseurl_path)
         full_baseurl_list.append(full_baseurl)
 
     return full_baseurl_list
@@ -134,7 +140,5 @@ def set_metalink(
     country: list[str] | None = None,
     protocol: list[str] | None = None,
 ) -> Path:
-    config = _generate_metalink_config(
-        repo_group, country=country, protocol=protocol
-    )
+    config = _generate_metalink_config(repo_group, country=country, protocol=protocol)
     return _merge_and_write(repo_group, config)

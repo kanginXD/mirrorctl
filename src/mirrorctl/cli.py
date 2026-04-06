@@ -2,7 +2,7 @@ import re
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import click
 import distro
@@ -15,6 +15,7 @@ from mirrorctl.data.rpmfusion_free import RPMFUSION_FREE_REPO_GROUP
 from mirrorctl.data.rpmfusion_nonfree import RPMFUSION_NONFREE_REPO_GROUP
 from mirrorctl.operations import set_baseurl, set_metalink
 from mirrorctl.types import RepoGroup
+from mirrorctl.validation import validate_country_mirrors
 
 _DISTRO_REPO_MAP: dict[str, RepoGroup] = {
     "fedora": FEDORA_REPO_GROUP,
@@ -32,7 +33,7 @@ _EXTERNAL_GROUP_REPO_MAP: dict[ExternalGroup, RepoGroup] = {
 }
 
 
-def _exit_with_error(message: str) -> None:
+def _exit_with_error(message: str) -> NoReturn:
     typer.echo(f"Error: {message}", err=True)
     raise typer.Exit(1)
 
@@ -75,10 +76,11 @@ def _validate_country_codes(value: list[str]) -> list[str]:
         if not re.match("^[A-Za-z]{2}$", country_code):
             _exit_with_error(
                 f"Invalid country code: {country_code}. "
-                "Country code must be exactly 2 uppercase letters (ISO 3166-1 Alpha-2)"
+                "Country code must be exactly 2 letters "
+                "(ISO 3166-1 Alpha-2)"
             )
 
-    return value
+    return [code.upper() for code in value]
 
 
 @app.command("auto-mirrors", help="Auto-select mirrors for repositories")
@@ -89,8 +91,8 @@ def auto_mirrors(
             help=(
                 "ISO 3166-1 Alpha-2 country codes to prefer (space-separated). "
                 "Note: if mirrors are not available in the specified countries, "
-                "the server will choose closest available ones. If you don't want this,"
-                "pin mirrors using 'use-baseurl' command."
+                "the server will choose closest available ones. If you don't want this, "
+                "pin mirrors using 'pin-mirrors' command."
             ),
             callback=_validate_country_codes,
         ),
@@ -115,6 +117,14 @@ def auto_mirrors(
     ] = None,
 ) -> None:
     repo_group = get_repo_group(group=group)
+
+    if country:
+        try:
+            validate_country_mirrors(repo_group, country)
+
+        except ValueError as e:
+            _exit_with_error(str(e))
+
     override_file = set_metalink(
         repo_group,
         country=country,
@@ -145,7 +155,7 @@ def pin_mirrors(
 ) -> None:
     if len(urls) == 0:
         raise typer.BadParameter(
-            "At least one mirror URL must be provided for use-baseurl"
+            "At least one mirror URL must be provided for pin-mirrors"
         )
 
     repo_group = get_repo_group(group=group)

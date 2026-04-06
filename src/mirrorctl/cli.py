@@ -280,7 +280,7 @@ def unset_all_mirrors_command() -> None:
 )
 def reset_command() -> None:
     override_file = reset_overrides()
-    print(f"Removed override file: {override_file}")
+    typer.echo(f"Removed override file: {override_file}")
 
 
 @app.command(
@@ -308,12 +308,22 @@ def refresh_cache() -> None:
 
 
 def _print_success_message(override_file: Path) -> None:
-    print(
+    typer.echo(
         f"Wrote DNF repo overrides on {override_file}\n\n"
         "IMPORTANT: Refresh metadata, e.g. `sudo mirrorctl refresh-cache` "
         "or `dnf clean all && dnf makecache --refresh`."
     )
 
 
+def main() -> None:
+    try:
+        app()
+
+    except PermissionError as e:
+        typer.echo(f"Error: {e}", err=True)
+        typer.echo("Try with sudo", err=True)
+        raise typer.Exit(1) from e
+
+
 if __name__ == "__main__":
-    app()
+    main()

@@ -1,5 +1,4 @@
 import configparser
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -31,18 +30,9 @@ def _read_existing_config() -> configparser.RawConfigParser:
 
 
 def _write_override_config(config: configparser.RawConfigParser) -> Path:
-    try:
-        OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with OVERRIDE_FILE.open("w") as f:
-            config.write(f, space_around_delimiters=False)
-
-    except PermissionError:
-        print(
-            f"Error: Permission denied writing to {OVERRIDE_FILE}\n"
-            "Try running with sudo.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
+    OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with OVERRIDE_FILE.open("w") as f:
+        config.write(f, space_around_delimiters=False)
 
     return OVERRIDE_FILE
 
@@ -85,17 +75,7 @@ def unset_all_mirrors(repo_groups: Sequence[RepoGroup]) -> Path:
 
 
 def reset_overrides() -> Path:
-    try:
-        OVERRIDE_FILE.unlink(missing_ok=True)
-
-    except PermissionError:
-        print(
-            f"Error: Permission denied deleting {OVERRIDE_FILE}\n"
-            "Try running with sudo.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-
+    OVERRIDE_FILE.unlink(missing_ok=True)
     return OVERRIDE_FILE
 
 

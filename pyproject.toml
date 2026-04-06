@@ -22,7 +22,7 @@ dev = [
 ]
 
 [project.scripts]
-mirrorctl = "mirrorctl.cli:app"
+mirrorctl = "mirrorctl.cli:main"
 
 [tool.uv]
 package = true

@@ -17,7 +17,7 @@ Control DNF 4/5 mirrors with simple commands.
 ## Install
 
 ```bash
-uvx tool install "git+https://github.com/kanginXD/mirrorctl.git"
+uv tool install "git+https://github.com/kanginXD/mirrorctl.git"
 ```
 
 Run with:

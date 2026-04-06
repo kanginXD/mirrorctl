@@ -10,11 +10,11 @@ Control DNF 4/5 mirrors with simple commands.
   - Fedora
   - AlmaLinux (TODO)
   - Rocky Linux (TODO)
-- Supported external groups:
+- Supported third-party repositories (configure with `--group`):
   - RPM Fusion free (`rpmfusion-free`)
   - RPM Fusion nonfree (`rpmfusion-nonfree`)
 - One override file: `/etc/dnf/repos.override.d/999-mirrorctl.repo`
-- Undo in one step: `mirrorctl remove-overrides`
+- Undo in one step: `mirrorctl reset`
 
 ## Install
 
@@ -47,63 +47,76 @@ sudo mirrorctl auto --country KR --protocol https --no-check
 ```
 
 - `--country` and `--protocol` are only preferences; another mirror can still
-  win. Use `pin-mirrors` instead to pin exact base URLs.
+  win. Use `pin` instead to pin exact base URLs.
 - Country codes: [ISO 3166-1 Alpha-2 (two letters)](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Officially_assigned_code_elements); repeat `--country` for each.
 - When `--country` or `--protocol` is set, mirror availability is checked before
   write (skip with `--no-check`).
 
-### `pin-mirrors` — fixed mirror URLs
+### `pin` — fixed mirror URLs or main-repository only
 
-Use either `--url` (repeat for multiple) or `--file`, not both.
+Use one mode only:
 
-Single URL:
+- **`--url` / `--file`** — fixed mirror base URL list (`--url` may be repeated). Not
+  together with `--official-only`.
+- **`--official-only`** — main-repository URLs only (no volunteer mirror network).
+  Cannot be combined with `--url` or `--file`. Works with `--group`.
+
+#### Single URL
+
 ```bash
-sudo mirrorctl pin-mirrors --url https://dl.fedoraproject.org/pub/fedora/linux
+sudo mirrorctl pin --url https://dl.fedoraproject.org/pub/fedora/linux
 ```
 
-Multiple URLs:
+#### Multiple URLs
+
 ```bash
-sudo mirrorctl pin-mirrors \
+sudo mirrorctl pin \
   --url https://dl.fedoraproject.org/pub/fedora/linux \
   --url https://download-ib01.fedoraproject.org/pub/fedora/linux
 ```
 
-From file (`mirrors.txt`: one URL per line; `#` starts a comment line):
+#### From a file
+
+One mirror base URL per line in `mirrors.txt` (`#` starts a comment).
+
+**Example `mirrors.txt`**
 
 ```text
 https://dl.fedoraproject.org/pub/fedora/linux
 https://download-ib01.fedoraproject.org/pub/fedora/linux
 ```
 
+**Run**
+
 ```bash
-sudo mirrorctl pin-mirrors --file ./mirrors.txt
+sudo mirrorctl pin --file ./mirrors.txt
 ```
 
-### `official` — official sites only (no mirror network)
+#### Main-repository only
 
-Run once per group you want to apply:
+Run once per `--group` you need:
 
 ```bash
-sudo mirrorctl official
-sudo mirrorctl official --group rpmfusion-free
-sudo mirrorctl official --group rpmfusion-nonfree
+sudo mirrorctl pin --official-only
+sudo mirrorctl pin --official-only --group rpmfusion-free
+sudo mirrorctl pin --official-only --group rpmfusion-nonfree
 ```
 
-### `block-all-mirrors` — block DNF auto mirror picks
+### `init-empty` — initialize empty mirror settings
 
-Writes empty mirror overrides for mirrorctl-managed repos so DNF cannot
-auto-select mirrors; you configure mirrors explicitly afterward.
+Writes empty mirror overrides for repos mirrorctl manages so DNF cannot
+auto-pick mirrors. You must set mirrors explicitly afterward.
 
 ```bash
-sudo mirrorctl block-all-mirrors
+sudo mirrorctl init-empty
 ```
 
-### `remove-overrides` — drop mirrorctl’s override file
+### `reset` — delete all mirrorctl overrides and revert back
 
-Removes `/etc/dnf/repos.override.d/999-mirrorctl.repo`.
+This command deletes mirrorctl's override file (`/etc/dnf/repos.override.d/999-mirrorctl.repo`).
 
 ```bash
-sudo mirrorctl remove-overrides
+sudo mirrorctl reset
 ```
 
 ### The `--group` option
@@ -119,20 +132,20 @@ metalink server and paths). Without `--group`, only the OS bundle is updated;
 RPM Fusion repos are left unchanged until you run the same command again with
 the right `--group`.
 
-Supported on: `auto`, `pin-mirrors`, `official`.
+Supported on: `auto`, `pin` (including `pin --official-only`).
 
 ```bash
 sudo mirrorctl auto --group rpmfusion-free
-sudo mirrorctl pin-mirrors --url https://download1.rpmfusion.org --group rpmfusion-free
-sudo mirrorctl official --group rpmfusion-nonfree
+sudo mirrorctl pin --url https://download1.rpmfusion.org --group rpmfusion-free
+sudo mirrorctl pin --official-only --group rpmfusion-nonfree
 ```
 
-### After changing overrides
+## After changing overrides
 
 DNF should refresh cached repo metadata to pick up the new override file.
 
 ```bash
-sudo mirrorctl refresh-dnf
+sudo mirrorctl refresh
 ```
 
 Or manually:

@@ -119,7 +119,7 @@ def _validate_country_codes(value: list[str] | None) -> list[str] | None:
         "Optional country and protocol flags are hints only. "
         "Unless --no-check is set, the metalink is fetched and preferences "
         "are checked against it (needs network). "
-        "For a fixed mirror list, use `pin-mirrors`."
+        "For a fixed mirror list, use `pin`."
     ),
 )
 def auto_mirrors(
@@ -178,10 +178,23 @@ def auto_mirrors(
 
 
 @app.command(
-    "pin-mirrors",
-    help="Use only the mirror base URLs you list (fixed list).",
+    "pin",
+    help=(
+        "Pin mirrors: use --url (repeat) or --file for fixed base URLs, "
+        "or --official-only for main-repository URLs only (not with --url / --file)."
+    ),
 )
 def pin_mirrors(
+    official_only: Annotated[
+        bool,
+        typer.Option(
+            "--official-only",
+            help=(
+                "Use main-repository download URLs only (no volunteer mirrors). "
+                "Cannot be combined with --url or --file."
+            ),
+        ),
+    ] = False,
     urls: Annotated[
         list[AnyUrl] | None,
         typer.Option(
@@ -207,8 +220,19 @@ def pin_mirrors(
         typer.Option(help=_GROUP_OPTION_HELP),
     ] = None,
 ) -> None:
+    if official_only:
+        if urls is not None or file is not None:
+            _exit_with_error(
+                "Cannot use --official-only together with --url or --file."
+            )
+
+        repo_group = get_repo_group(group=group)
+        override_file = set_official_only(repo_group)
+        _print_success_message(override_file)
+        return
+
     if (urls is None and file is None) or (urls is not None and file is not None):
-        _exit_with_error("Use either --url (repeatable) or --file for pin-mirrors.")
+        _exit_with_error("Use either --url (repeatable) or --file for pin.")
 
     selected_urls: list[AnyUrl] = []
     if file is not None:
@@ -244,25 +268,10 @@ def pin_mirrors(
 
 
 @app.command(
-    "official",
-    help=("Use only the main repository sites, not volunteer mirror networks."),
-)
-def official_only(
-    group: Annotated[
-        ExternalGroup | None,
-        typer.Option(help=_GROUP_OPTION_HELP),
-    ] = None,
-) -> None:
-    repo_group = get_repo_group(group=group)
-    override_file = set_official_only(repo_group)
-    _print_success_message(override_file)
-
-
-@app.command(
-    "block-all-mirrors",
+    "init-empty",
     help=(
         "Write empty mirror overrides for repos mirrorctl manages so DNF cannot "
-        "auto-pick mirrors (you must set mirrors explicitly)."
+        "auto-pick mirrors. You must set mirrors explicitly afterward."
     ),
 )
 def unset_all_mirrors_command() -> None:
@@ -271,7 +280,7 @@ def unset_all_mirrors_command() -> None:
 
 
 @app.command(
-    "remove-overrides",
+    "reset",
     help="Remove mirrorctl's override file under /etc/dnf/repos.override.d/.",
 )
 def reset_command() -> None:
@@ -280,7 +289,7 @@ def reset_command() -> None:
 
 
 @app.command(
-    "refresh-dnf",
+    "refresh",
     help=(
         "Run `dnf clean all` then `dnf makecache --refresh` "
         "(pick up repo changes; use sudo if required on your system)."
@@ -305,7 +314,7 @@ def refresh_cache() -> None:
 
 def _print_success_message(override_file: Path) -> None:
     notice = (
-        "IMPORTANT: Refresh metadata, e.g. `mirrorctl refresh-dnf` "
+        "IMPORTANT: Refresh metadata, e.g. `mirrorctl refresh` "
         "or `dnf clean all && dnf makecache --refresh`."
     )
     typer.echo(f"Wrote DNF repo overrides on {override_file}\n\n")

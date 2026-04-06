@@ -308,11 +308,12 @@ def refresh_cache() -> None:
 
 
 def _print_success_message(override_file: Path) -> None:
-    typer.echo(
-        f"Wrote DNF repo overrides on {override_file}\n\n"
+    notice = (
         "IMPORTANT: Refresh metadata, e.g. `sudo mirrorctl refresh-cache` "
         "or `dnf clean all && dnf makecache --refresh`."
     )
+    typer.echo(f"Wrote DNF repo overrides on {override_file}\n\n")
+    typer.echo(click.style(notice, fg="yellow"))
 
 
 def main() -> None:

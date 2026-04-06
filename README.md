@@ -2,6 +2,8 @@
 
 Control DNF 4/5 mirrors with simple commands.
 
+**WARNING:** Still in development. Interfaces and behavior may change without notice.
+
 ## Features
 
 - Supported distro:

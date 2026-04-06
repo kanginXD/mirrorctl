@@ -19,9 +19,8 @@ ENV LANG=en_US.UTF-8
 # Prepare DNF Mirrors
 
 RUN mkdir -p /usr/local/etc
-COPY scripts/pin-dnf-mirrors /usr/local/bin/pin-dnf-mirrors
-COPY .devcontainer/mirrors.txt /usr/local/etc/mirrors.txt
-RUN pin-dnf-mirrors /usr/local/etc/mirrors.txt
+COPY scripts/use-main-repo-only /usr/local/bin/use-main-repo-only
+RUN use-main-repo-only
 
 # -----------------------------------------------------------------------------
 # Install essential packages

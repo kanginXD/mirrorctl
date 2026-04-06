@@ -1,2 +1,0 @@
-https://dl.fedoraproject.org/pub/fedora/linux
-https://download-ib01.fedoraproject.org/pub/fedora/linux

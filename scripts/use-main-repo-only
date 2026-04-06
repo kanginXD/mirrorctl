@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#
+# Write a DNF override file that uses only official upstream URLs.
+#
+
+set -e
+
+OVERRIDE_DIR="/etc/dnf/repos.override.d"
+OVERRIDE_FILE="${OVERRIDE_DIR}/100_official_repo_only.repo"
+
+write_repo() {
+    local repo_id="$1"
+    local baseurl="$2"
+
+    cat >> "${OVERRIDE_FILE}" <<EOF
+[${repo_id}]
+baseurl=${baseurl}
+metalink=
+
+EOF
+}
+
+mkdir -p "${OVERRIDE_DIR}"
+: > "${OVERRIDE_FILE}"
+
+# Fedora official
+FEDORA_ROOT="https://dl.fedoraproject.org/pub/fedora/linux"
+write_repo "updates-testing" "${FEDORA_ROOT}/updates/testing/\$releasever/Everything/\$basearch/"
+write_repo "updates-testing-debuginfo" "${FEDORA_ROOT}/updates/testing/\$releasever/Everything/\$basearch/debug/"
+write_repo "updates-testing-source" "${FEDORA_ROOT}/updates/testing/\$releasever/Everything/SRPMS/"
+write_repo "updates" "${FEDORA_ROOT}/updates/\$releasever/Everything/\$basearch/"
+write_repo "updates-debuginfo" "${FEDORA_ROOT}/updates/\$releasever/Everything/\$basearch/debug/"
+write_repo "updates-source" "${FEDORA_ROOT}/updates/\$releasever/Everything/SRPMS/"
+write_repo "fedora" "${FEDORA_ROOT}/releases/\$releasever/Everything/\$basearch/os/"
+write_repo "fedora-debuginfo" "${FEDORA_ROOT}/releases/\$releasever/Everything/\$basearch/debug/tree/"
+write_repo "fedora-source" "${FEDORA_ROOT}/releases/\$releasever/Everything/source/tree/"
+
+# RPM Fusion official
+RPMFUSION_ROOT="https://download1.rpmfusion.org"
+write_repo "rpmfusion-free-updates-testing" "${RPMFUSION_ROOT}/free/fedora/updates/testing/\$releasever/\$basearch/"
+write_repo "rpmfusion-free-updates-testing-debuginfo" "${RPMFUSION_ROOT}/free/fedora/updates/testing/\$releasever/\$basearch/debug/"
+write_repo "rpmfusion-free-updates-testing-source" "${RPMFUSION_ROOT}/free/fedora/updates/testing/\$releasever/SRPMS/"
+write_repo "rpmfusion-free-updates" "${RPMFUSION_ROOT}/free/fedora/updates/\$releasever/\$basearch/"
+write_repo "rpmfusion-free-updates-debuginfo" "${RPMFUSION_ROOT}/free/fedora/updates/\$releasever/\$basearch/debug/"
+write_repo "rpmfusion-free-updates-source" "${RPMFUSION_ROOT}/free/fedora/updates/\$releasever/SRPMS/"
+write_repo "rpmfusion-free" "${RPMFUSION_ROOT}/free/fedora/releases/\$releasever/Everything/\$basearch/os/"
+write_repo "rpmfusion-free-debuginfo" "${RPMFUSION_ROOT}/free/fedora/releases/\$releasever/Everything/\$basearch/debug/"
+write_repo "rpmfusion-free-source" "${RPMFUSION_ROOT}/free/fedora/releases/\$releasever/Everything/source/SRPMS/"
+write_repo "rpmfusion-nonfree-updates-testing" "${RPMFUSION_ROOT}/nonfree/fedora/updates/testing/\$releasever/\$basearch/"
+write_repo "rpmfusion-nonfree-updates-testing-debuginfo" "${RPMFUSION_ROOT}/nonfree/fedora/updates/testing/\$releasever/\$basearch/debug/"
+write_repo "rpmfusion-nonfree-updates-testing-source" "${RPMFUSION_ROOT}/nonfree/fedora/updates/testing/\$releasever/SRPMS/"
+write_repo "rpmfusion-nonfree-updates" "${RPMFUSION_ROOT}/nonfree/fedora/updates/\$releasever/\$basearch/"
+write_repo "rpmfusion-nonfree-updates-debuginfo" "${RPMFUSION_ROOT}/nonfree/fedora/updates/\$releasever/\$basearch/debug/"
+write_repo "rpmfusion-nonfree-updates-source" "${RPMFUSION_ROOT}/nonfree/fedora/updates/\$releasever/SRPMS/"
+write_repo "rpmfusion-nonfree" "${RPMFUSION_ROOT}/nonfree/fedora/releases/\$releasever/Everything/\$basearch/os/"
+write_repo "rpmfusion-nonfree-debuginfo" "${RPMFUSION_ROOT}/nonfree/fedora/releases/\$releasever/Everything/\$basearch/debug/"
+write_repo "rpmfusion-nonfree-source" "${RPMFUSION_ROOT}/nonfree/fedora/releases/\$releasever/Everything/source/SRPMS/"
+
+echo "Wrote ${OVERRIDE_FILE}"
+dnf clean all && dnf makecache --refresh

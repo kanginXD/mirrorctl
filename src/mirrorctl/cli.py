@@ -75,7 +75,7 @@ _GROUP_OPTION_HELP = (
 
 _APP_HELP = (
     "Change DNF mirrors in a simple way. "
-    "All changes are written to /etc/dnf/repos.override.d/100-mirrorctl.repo. "
+    "All changes are written to /etc/dnf/repos.override.d/999-ultimate.repo. "
     "Fedora and RPM Fusion use different mirror pools; "
     "for add-ons such as RPM Fusion, use --group."
 )

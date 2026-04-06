@@ -1,5 +1,6 @@
 import configparser
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import AnyUrl
@@ -25,6 +26,23 @@ def _read_existing_config() -> configparser.RawConfigParser:
     return config
 
 
+def _write_override_config(config: configparser.RawConfigParser) -> Path:
+    try:
+        OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with OVERRIDE_FILE.open("w") as f:
+            config.write(f, space_around_delimiters=False)
+
+    except PermissionError:
+        print(
+            f"Error: Permission denied writing to {OVERRIDE_FILE}\n"
+            "Try running with sudo.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    return OVERRIDE_FILE
+
+
 def _merge_and_write(
     repo_group: RepoGroup,
     new_config: configparser.RawConfigParser,
@@ -40,20 +58,26 @@ def _merge_and_write(
         for key, value in new_config.items(section):
             merged.set(section, key, value)
 
-    try:
-        OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with OVERRIDE_FILE.open("w") as f:
-            merged.write(f, space_around_delimiters=False)
+    return _write_override_config(merged)
 
-    except PermissionError:
-        print(
-            f"Error: Permission denied writing to {OVERRIDE_FILE}\n"
-            "Try running with sudo.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
 
-    return OVERRIDE_FILE
+def unset_all_mirrors(repo_groups: Sequence[RepoGroup]) -> Path:
+    config = _new_repo_config()
+    seen: set[str] = set()
+
+    for group in repo_groups:
+        for repo_data in group.repo_data_list:
+            rid = repo_data.repo_id
+
+            if rid in seen:
+                continue
+
+            seen.add(rid)
+            config.add_section(rid)
+            config.set(rid, "baseurl", "")
+            config.set(rid, "metalink", "")
+
+    return _write_override_config(config)
 
 
 def metalink_builder(

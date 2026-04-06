@@ -9,6 +9,7 @@ from mirrorctl.operations import (
     metalink_builder,
     set_baseurl,
     set_metalink,
+    unset_all_mirrors,
 )
 from mirrorctl.types import RepoData, RepoGroup
 
@@ -226,3 +227,60 @@ class TestMerge:
         metalink = config.get("repo-x", "metalink")
         assert "country=US" in metalink
         assert "country=KR" not in metalink
+
+
+class TestUnsetAllMirrors:
+    def test_writes_empty_baseurl_and_metalink(
+        self, sample_repo_group, override_file
+    ):
+        result = unset_all_mirrors([sample_repo_group])
+
+        assert result == override_file
+
+        config = configparser.RawConfigParser()
+        config.read(override_file)
+
+        for rid in ("test-updates", "test-updates-source"):
+            assert config.get(rid, "baseurl") == ""
+            assert config.get(rid, "metalink") == ""
+
+    def test_overwrites_file(self, sample_repo_group, override_file):
+        set_metalink(sample_repo_group, country=["KR"])
+        unset_all_mirrors([sample_repo_group])
+
+        config = configparser.RawConfigParser()
+        config.read(override_file)
+
+        assert config.get("test-updates", "baseurl") == ""
+        assert config.get("test-updates", "metalink") == ""
+
+    def test_deduplicates_repo_id(self, override_file):
+        dup_group_a = RepoGroup(
+            group_name="a",
+            metalink_base_url="https://mirrors.example.com",
+            repo_data_list=[
+                RepoData(
+                    repo_id="dup",
+                    metalink_repo_id="x",
+                    baseurl_path="/",
+                ),
+            ],
+        )
+        dup_group_b = RepoGroup(
+            group_name="b",
+            metalink_base_url="https://mirrors.example.com",
+            repo_data_list=[
+                RepoData(
+                    repo_id="dup",
+                    metalink_repo_id="y",
+                    baseurl_path="/",
+                ),
+            ],
+        )
+
+        unset_all_mirrors([dup_group_a, dup_group_b])
+
+        config = configparser.RawConfigParser()
+        config.read(override_file)
+
+        assert config.sections() == ["dup"]

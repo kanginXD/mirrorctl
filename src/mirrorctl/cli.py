@@ -13,9 +13,15 @@ from pydantic import AnyUrl
 from mirrorctl.data.fedora import FEDORA_REPO_GROUP
 from mirrorctl.data.rpmfusion_free import RPMFUSION_FREE_REPO_GROUP
 from mirrorctl.data.rpmfusion_nonfree import RPMFUSION_NONFREE_REPO_GROUP
-from mirrorctl.operations import set_baseurl, set_metalink
+from mirrorctl.operations import set_baseurl, set_metalink, unset_all_mirrors
 from mirrorctl.types import RepoGroup
 from mirrorctl.validation import validate_country_mirrors
+
+MANAGED_REPO_GROUPS: tuple[RepoGroup, ...] = (
+    FEDORA_REPO_GROUP,
+    RPMFUSION_FREE_REPO_GROUP,
+    RPMFUSION_NONFREE_REPO_GROUP,
+)
 
 _DISTRO_REPO_MAP: dict[str, RepoGroup] = {
     "fedora": FEDORA_REPO_GROUP,
@@ -160,6 +166,18 @@ def pin_mirrors(
 
     repo_group = get_repo_group(group=group)
     override_file = set_baseurl(repo_group, urls)
+    _print_success_message(override_file)
+
+
+@app.command(
+    "unset-all-mirrors",
+    help=(
+        "Clear mirrorctl overrides for all managed repos "
+        "(empty baseurl and metalink) to avoid unintended mirror use"
+    ),
+)
+def unset_all_mirrors_command() -> None:
+    override_file = unset_all_mirrors(MANAGED_REPO_GROUPS)
     _print_success_message(override_file)
 
 

@@ -130,5 +130,13 @@ sudo mirrorctl official-only --group rpmfusion-nonfree
 DNF must refresh cached repo metadata to pick up the new override file.
 
 ```bash
-sudo dnf clean all && sudo dnf repo info --all
+sudo mirrorctl refresh-cache
 ```
+
+Or manually:
+
+```bash
+sudo dnf clean all && sudo dnf makecache --refresh
+```
+
+You can also use `sudo dnf repo info --all` after cleaning to inspect repos.

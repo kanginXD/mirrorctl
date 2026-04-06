@@ -1,4 +1,5 @@
 import re
+import subprocess
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, NoReturn
@@ -279,10 +280,35 @@ def reset_command() -> None:
     print(f"Removed override file: {override_file}")
 
 
+@app.command(
+    "refresh-cache",
+    help=(
+        "Run `dnf clean all` then `dnf makecache --refresh` "
+        "(same as after changing overrides; use sudo if required on your system)."
+    ),
+)
+def refresh_cache() -> None:
+    try:
+        subprocess.run(["dnf", "clean", "all"], check=True)
+
+    except FileNotFoundError:
+        _exit_with_error("dnf not found in PATH.")
+
+    except subprocess.CalledProcessError as e:
+        _exit_with_error(f"`dnf clean all` failed (exit {e.returncode}).")
+
+    try:
+        subprocess.run(["dnf", "makecache", "--refresh"], check=True)
+
+    except subprocess.CalledProcessError as e:
+        _exit_with_error(f"`dnf makecache --refresh` failed (exit {e.returncode}).")
+
+
 def _print_success_message(override_file: Path) -> None:
     print(
         f"Wrote DNF repo overrides on {override_file}\n\n"
-        "IMPORTANT: Refresh metadata by running `dnf clean all && dnf repo info --all`"
+        "IMPORTANT: Refresh metadata, e.g. `sudo mirrorctl refresh-cache` "
+        "or `dnf clean all && dnf makecache --refresh`."
     )
 
 

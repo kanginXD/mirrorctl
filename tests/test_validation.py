@@ -6,7 +6,7 @@ import pytest
 from mirrorctl.validation import (
     _resolve_dnf_variables,
     get_dnf_variables,
-    validate_country_mirrors,
+    validate_metalink_preferences,
 )
 
 _SAMPLE_DNF_DUMP = """\
@@ -43,6 +43,21 @@ _METALINK_XML_US_ONLY = """\
       <resources>
         <url protocol="https" type="https" location="US" preference="100">
           https://dl.fedoraproject.org/pub/fedora/linux/
+        </url>
+      </resources>
+    </file>
+  </files>
+</metalink>
+"""
+
+_METALINK_XML_HTTP_US = """\
+<?xml version="1.0" encoding="utf-8"?>
+<metalink>
+  <files>
+    <file name="repomd.xml">
+      <resources>
+        <url protocol="http" type="http" location="US" preference="100">
+          http://example.invalid/
         </url>
       </resources>
     </file>
@@ -105,7 +120,7 @@ class TestResolveDnfVariables:
         assert result == "no-variables-here"
 
 
-class TestValidateCountryMirrors:
+class TestValidateMetalinkPreferences:
     def test_valid_country(self, sample_repo_group, _mock_dnf_variables):
         mock_response = MagicMock()
         mock_response.text = _METALINK_XML_WITH_KR_US
@@ -114,7 +129,11 @@ class TestValidateCountryMirrors:
             "mirrorctl.validation.httpx.get",
             return_value=mock_response,
         ):
-            validate_country_mirrors(sample_repo_group, ["KR"])
+            validate_metalink_preferences(
+                sample_repo_group,
+                countries=["KR"],
+                protocols=None,
+            )
 
     def test_no_mirrors_for_country(self, sample_repo_group, _mock_dnf_variables):
         mock_response = MagicMock()
@@ -125,7 +144,11 @@ class TestValidateCountryMirrors:
             return_value=mock_response,
         ):
             with pytest.raises(ValueError, match="No mirrors found"):
-                validate_country_mirrors(sample_repo_group, ["KR"])
+                validate_metalink_preferences(
+                    sample_repo_group,
+                    countries=["KR"],
+                    protocols=None,
+                )
 
     def test_http_error(self, sample_repo_group, _mock_dnf_variables):
         with patch(
@@ -133,7 +156,11 @@ class TestValidateCountryMirrors:
             side_effect=httpx.ConnectError("connection failed"),
         ):
             with pytest.raises(ValueError, match="Failed to fetch"):
-                validate_country_mirrors(sample_repo_group, ["US"])
+                validate_metalink_preferences(
+                    sample_repo_group,
+                    countries=["US"],
+                    protocols=None,
+                )
 
     def test_multiple_countries_all_valid(self, sample_repo_group, _mock_dnf_variables):
         mock_response = MagicMock()
@@ -143,7 +170,11 @@ class TestValidateCountryMirrors:
             "mirrorctl.validation.httpx.get",
             return_value=mock_response,
         ):
-            validate_country_mirrors(sample_repo_group, ["KR", "US"])
+            validate_metalink_preferences(
+                sample_repo_group,
+                countries=["KR", "US"],
+                protocols=None,
+            )
 
     def test_multiple_countries_one_invalid(
         self, sample_repo_group, _mock_dnf_variables
@@ -159,4 +190,54 @@ class TestValidateCountryMirrors:
                 ValueError,
                 match="No mirrors found for country 'KR'",
             ):
-                validate_country_mirrors(sample_repo_group, ["US", "KR"])
+                validate_metalink_preferences(
+                    sample_repo_group,
+                    countries=["US", "KR"],
+                    protocols=None,
+                )
+
+    def test_protocol_only_valid(self, sample_repo_group, _mock_dnf_variables):
+        mock_response = MagicMock()
+        mock_response.text = _METALINK_XML_WITH_KR_US
+
+        with patch(
+            "mirrorctl.validation.httpx.get",
+            return_value=mock_response,
+        ):
+            validate_metalink_preferences(
+                sample_repo_group,
+                countries=None,
+                protocols=["https"],
+            )
+
+    def test_protocol_only_invalid(self, sample_repo_group, _mock_dnf_variables):
+        mock_response = MagicMock()
+        mock_response.text = _METALINK_XML_HTTP_US
+
+        with patch(
+            "mirrorctl.validation.httpx.get",
+            return_value=mock_response,
+        ):
+            with pytest.raises(ValueError, match="No mirrors found for protocol"):
+                validate_metalink_preferences(
+                    sample_repo_group,
+                    countries=None,
+                    protocols=["https"],
+                )
+
+    def test_country_and_protocol_mismatch(
+        self, sample_repo_group, _mock_dnf_variables
+    ):
+        mock_response = MagicMock()
+        mock_response.text = _METALINK_XML_WITH_KR_US
+
+        with patch(
+            "mirrorctl.validation.httpx.get",
+            return_value=mock_response,
+        ):
+            with pytest.raises(ValueError, match="No mirrors for country 'KR'"):
+                validate_metalink_preferences(
+                    sample_repo_group,
+                    countries=["KR"],
+                    protocols=["http"],
+                )

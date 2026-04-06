@@ -19,7 +19,7 @@ from mirrorctl.operations import (
     unset_all_mirrors,
 )
 from mirrorctl.types import RepoGroup
-from mirrorctl.validation import validate_country_mirrors
+from mirrorctl.validation import validate_metalink_preferences
 
 MANAGED_REPO_GROUPS: tuple[RepoGroup, ...] = (
     FEDORA_REPO_GROUP,
@@ -111,8 +111,10 @@ def _validate_country_codes(value: list[str]) -> list[str]:
     "auto-mirrors",
     help=(
         "Mirrors are chosen for you automatically (GeoIP based). "
-        "You can say which countries or http/https you prefer; "
+        "You can say which countries or protocol (http/https/rsync) you prefer; "
         "those are only hints and another mirror may still be picked. "
+        "Unless --no-check is set, the metalink is fetched and country/protocol "
+        "choices are checked against it (needs network). "
         "To use only the mirrors you choose, use `pin-mirrors`."
     ),
 )
@@ -121,9 +123,9 @@ def auto_mirrors(
         list[str] | None,
         typer.Option(
             help=(
-                "Prefer mirrors in these countries (two-letter codes). "
-                "Pass the flag once per code, e.g. --country KR --country US. "
-                "mirrorctl checks that mirrors exist before applying (needs network)."
+                "Prefer mirrors in these countries. "
+                "Codes are ISO 3166-1 Alpha-2 (two Latin letters); case-insensitive. "
+                "Pass the flag once per code, e.g. --country KR --country US."
             ),
             callback=_validate_country_codes,
         ),
@@ -132,11 +134,19 @@ def auto_mirrors(
         list[str] | None,
         typer.Option(
             help=(
-                "Prefer https, http, or both (e.g. --protocol https --protocol http). "
+                "Prefer https, http, rsync, or a mix "
+                "(e.g. --protocol https --protocol rsync). "
                 "If none match, another option may still be used."
             ),
         ),
     ] = None,
+    no_check: Annotated[
+        bool,
+        typer.Option(
+            "--no-check",
+            help="Skip country/protocol availability checks.",
+        ),
+    ] = False,
     group: Annotated[
         ExternalGroup | None,
         typer.Option(help=_GROUP_OPTION_HELP),
@@ -144,9 +154,13 @@ def auto_mirrors(
 ) -> None:
     repo_group = get_repo_group(group=group)
 
-    if country:
+    if not no_check and (country or protocol):
         try:
-            validate_country_mirrors(repo_group, country)
+            validate_metalink_preferences(
+                repo_group,
+                countries=country,
+                protocols=protocol,
+            )
 
         except ValueError as e:
             _exit_with_error(str(e))

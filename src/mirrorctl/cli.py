@@ -1,7 +1,6 @@
 import re
 from enum import StrEnum
 from pathlib import Path
-from textwrap import dedent
 from typing import Annotated, NoReturn
 
 import click
@@ -67,7 +66,21 @@ def get_repo_group(
     return _EXTERNAL_GROUP_REPO_MAP[ExternalGroup(group)]
 
 
-app = typer.Typer(help="Manage repository mirrors", no_args_is_help=True)
+_GROUP_OPTION_HELP = (
+    "Which repository bundle to change. "
+    "Omitted: your distro's default (Fedora on Fedora). "
+    "Use rpmfusion-free or rpmfusion-nonfree for RPM Fusion "
+    "(different mirror pool; configure separately from Fedora)."
+)
+
+_APP_HELP = (
+    "Change DNF mirrors in a simple way. "
+    "All changes are written to /etc/dnf/repos.override.d/100-mirrorctl.repo. "
+    "Fedora and RPM Fusion use different mirror pools; "
+    "for add-ons such as RPM Fusion, use --group."
+)
+
+app = typer.Typer(help=_APP_HELP, no_args_is_help=True)
 
 
 class AnyUrlTypeParser(click.ParamType):
@@ -94,16 +107,23 @@ def _validate_country_codes(value: list[str]) -> list[str]:
     return [code.upper() for code in value]
 
 
-@app.command("auto-mirrors", help="Auto-select mirrors for repositories")
+@app.command(
+    "auto-mirrors",
+    help=(
+        "Mirrors are chosen for you automatically (GeoIP based). "
+        "You can say which countries or http/https you prefer; "
+        "those are only hints and another mirror may still be picked. "
+        "To use only the mirrors you choose, use `pin-mirrors`."
+    ),
+)
 def auto_mirrors(
     country: Annotated[
         list[str] | None,
         typer.Option(
             help=(
-                "ISO 3166-1 Alpha-2 country codes to prefer (space-separated). "
-                "Note: if mirrors are not available in the specified countries, "
-                "the server will choose closest available ones. If you don't want this, "
-                "pin mirrors using 'pin-mirrors' command."
+                "Prefer mirrors in these countries (two-letter codes). "
+                "Pass the flag once per code, e.g. --country KR --country US. "
+                "mirrorctl checks that mirrors exist before applying (needs network)."
             ),
             callback=_validate_country_codes,
         ),
@@ -112,19 +132,14 @@ def auto_mirrors(
         list[str] | None,
         typer.Option(
             help=(
-                "Protocols to prefer (space-separated, e.g., --protocol https http). "
-                "Note: if there's no mirrors available with the specified protocols, "
-                "the server will choose closest available ones. "
-                "If you don't want this, pin mirrors using 'pin-mirrors' command."
+                "Prefer https, http, or both (e.g. --protocol https --protocol http). "
+                "If none match, another option may still be used."
             ),
         ),
     ] = None,
     group: Annotated[
         ExternalGroup | None,
-        typer.Option(
-            help="Repository group to apply changes to. "
-            "If not provided, defaults to system's repo group",
-        ),
+        typer.Option(help=_GROUP_OPTION_HELP),
     ] = None,
 ) -> None:
     repo_group = get_repo_group(group=group)
@@ -144,24 +159,21 @@ def auto_mirrors(
     _print_success_message(override_file)
 
 
-@app.command("pin-mirrors", help="Pin mirrors for repositories")
+@app.command(
+    "pin-mirrors",
+    help="Use only the mirror addresses you list (fixed list).",
+)
 def pin_mirrors(
     urls: Annotated[
         list[AnyUrl],
         typer.Argument(
-            help=(
-                "Mirror URLs to use (space-separated). "
-                "Copy & paste exact urls from the mirrost list website."
-            ),
+            help="Mirror addresses, space-separated.",
             click_type=AnyUrlTypeParser(),
         ),
     ],
     group: Annotated[
         ExternalGroup | None,
-        typer.Option(
-            help="Extra repository group to apply changes to. "
-            "If not provided, defaults to system's repo group",
-        ),
+        typer.Option(help=_GROUP_OPTION_HELP),
     ] = None,
 ) -> None:
     if len(urls) == 0:
@@ -177,17 +189,14 @@ def pin_mirrors(
 @app.command(
     "official-only",
     help=(
-        "Pin repos to the distributor's official download URLs only; "
-        "metalink is cleared so mirror pools are not used."
+        "Download only from the official project sites, "
+        "not from volunteer mirror networks."
     ),
 )
 def official_only(
     group: Annotated[
         ExternalGroup | None,
-        typer.Option(
-            help="Repository group to apply changes to. "
-            "If not provided, defaults to system's repo group",
-        ),
+        typer.Option(help=_GROUP_OPTION_HELP),
     ] = None,
 ) -> None:
     repo_group = get_repo_group(group=group)
@@ -198,8 +207,8 @@ def official_only(
 @app.command(
     "unset-all-mirrors",
     help=(
-        "Clear mirrorctl overrides for all managed repos "
-        "(empty baseurl and metalink) to avoid unintended mirror use"
+        "Write empty mirror overrides for every repo mirrorctl manages to block "
+        "DNF automatic mirror selection."
     ),
 )
 def unset_all_mirrors_command() -> None:
@@ -209,14 +218,8 @@ def unset_all_mirrors_command() -> None:
 
 def _print_success_message(override_file: Path) -> None:
     print(
-        dedent(f"""
-        --------------------------
-        Changes made successfully!
-
-        Steps you must take:
-        1. Check config at {override_file}
-        2. Apply config by running `dnf clean all && dnf repo info --all`
-        """)
+        f"Wrote DNF repo overrides on {override_file}\n\n"
+        "IMPORTANT: Refresh metadata by running `dnf clean all && dnf repo info --all`"
     )
 
 

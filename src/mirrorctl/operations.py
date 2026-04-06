@@ -84,6 +84,21 @@ def unset_all_mirrors(repo_groups: Sequence[RepoGroup]) -> Path:
     return _write_override_config(config)
 
 
+def reset_overrides() -> Path:
+    try:
+        OVERRIDE_FILE.unlink(missing_ok=True)
+
+    except PermissionError:
+        print(
+            f"Error: Permission denied deleting {OVERRIDE_FILE}\n"
+            "Try running with sudo.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    return OVERRIDE_FILE
+
+
 def metalink_builder(
     metalink_base: AnyUrl,
     repo_id: str,

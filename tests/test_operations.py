@@ -6,6 +6,7 @@ from pydantic import AnyUrl
 from mirrorctl.operations import (
     build_full_baseurl_list,
     metalink_builder,
+    reset_overrides,
     set_baseurl,
     set_metalink,
     set_official_only,
@@ -328,3 +329,20 @@ class TestUnsetAllMirrors:
         config.read(override_file)
 
         assert config.sections() == ["dup"]
+
+
+class TestResetOverrides:
+    def test_deletes_override_file(self, sample_repo_group, override_file):
+        set_metalink(sample_repo_group, country=["KR"])
+        assert override_file.exists()
+
+        result = reset_overrides()
+        assert result == override_file
+        assert not override_file.exists()
+
+    def test_no_error_when_file_missing(self, override_file):
+        if override_file.exists():
+            override_file.unlink()
+
+        result = reset_overrides()
+        assert result == override_file

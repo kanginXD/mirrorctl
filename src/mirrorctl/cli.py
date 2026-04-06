@@ -13,6 +13,7 @@ from mirrorctl.data.fedora import FEDORA_REPO_GROUP
 from mirrorctl.data.rpmfusion_free import RPMFUSION_FREE_REPO_GROUP
 from mirrorctl.data.rpmfusion_nonfree import RPMFUSION_NONFREE_REPO_GROUP
 from mirrorctl.operations import (
+    reset_overrides,
     set_baseurl,
     set_metalink,
     set_official_only,
@@ -228,6 +229,15 @@ def official_only(
 def unset_all_mirrors_command() -> None:
     override_file = unset_all_mirrors(MANAGED_REPO_GROUPS)
     _print_success_message(override_file)
+
+
+@app.command(
+    "reset",
+    help="Delete mirrorctl override file.",
+)
+def reset_command() -> None:
+    override_file = reset_overrides()
+    print(f"Removed override file: {override_file}")
 
 
 def _print_success_message(override_file: Path) -> None:

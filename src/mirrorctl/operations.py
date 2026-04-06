@@ -9,7 +9,7 @@ from mirrorctl.types import RepoData, RepoGroup
 from mirrorctl.utils import join_url
 
 OVERRIDE_DIR = Path("/etc/dnf/repos.override.d")
-OVERRIDE_FILE = OVERRIDE_DIR / "999-ultimate.repo"
+OVERRIDE_FILE = OVERRIDE_DIR / "999-mirrorctl.repo"
 
 
 def _preserve_option_key(optionstr: str) -> str:

@@ -28,6 +28,6 @@ def sample_repo_group() -> RepoGroup:
 
 @pytest.fixture
 def override_file(tmp_path):
-    path = tmp_path / "999-ultimate.repo"
+    path = tmp_path / "999-mirrorctl.repo"
     with patch("mirrorctl.operations.OVERRIDE_FILE", path):
         yield path

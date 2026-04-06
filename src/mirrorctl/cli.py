@@ -76,7 +76,7 @@ _GROUP_OPTION_HELP = (
 
 _APP_HELP = (
     "Change DNF mirrors in a simple way. "
-    "All changes are written to /etc/dnf/repos.override.d/999-ultimate.repo. "
+    "All changes are written to /etc/dnf/repos.override.d/999-mirrorctl.repo. "
     "Fedora and RPM Fusion use different mirror pools; "
     "for add-ons such as RPM Fusion, use --group."
 )
@@ -180,24 +180,63 @@ def auto_mirrors(
 )
 def pin_mirrors(
     urls: Annotated[
-        list[AnyUrl],
-        typer.Argument(
-            help="Mirror addresses, space-separated.",
+        list[AnyUrl] | None,
+        typer.Option(
+            "--url",
+            help="Mirror address. Repeat --url for multiple values.",
             click_type=AnyUrlTypeParser(),
         ),
-    ],
+    ] = None,
+    file: Annotated[
+        Path | None,
+        typer.Option(
+            "--file",
+            help="Path to a file with one mirror URL per line.",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+        ),
+    ] = None,
     group: Annotated[
         ExternalGroup | None,
         typer.Option(help=_GROUP_OPTION_HELP),
     ] = None,
 ) -> None:
-    if len(urls) == 0:
-        raise typer.BadParameter(
-            "At least one mirror URL must be provided for pin-mirrors"
-        )
+    if (urls is None and file is None) or (urls is not None and file is not None):
+        _exit_with_error("Use either --url (repeatable) or --file for pin-mirrors.")
+
+    selected_urls: list[AnyUrl] = []
+    if file is not None:
+        try:
+            file_text = file.read_text()
+
+        except OSError as e:
+            _exit_with_error(f"Failed to read file: {e}")
+
+        else:
+            for line in file_text.splitlines():
+                value = line.strip()
+                if value == "" or value.startswith("#"):
+                    continue
+
+                try:
+                    selected_urls.append(AnyUrl(value))
+
+                except pydantic.ValidationError:
+                    _exit_with_error(f"Invalid URL in file: {value}")
+
+            if len(selected_urls) == 0:
+                _exit_with_error("No valid mirror URLs found in file.")
+
+    else:
+        selected_urls = urls or []
+        if len(selected_urls) == 0:
+            _exit_with_error("At least one --url must be provided.")
 
     repo_group = get_repo_group(group=group)
-    override_file = set_baseurl(repo_group, urls)
+    override_file = set_baseurl(repo_group, selected_urls)
     _print_success_message(override_file)
 
 

@@ -12,9 +12,13 @@ OVERRIDE_DIR = Path("/etc/dnf/repos.override.d")
 OVERRIDE_FILE = OVERRIDE_DIR / "100-mirrorctl.repo"
 
 
+def _preserve_option_key(optionstr: str) -> str:
+    return optionstr
+
+
 def _new_repo_config() -> configparser.RawConfigParser:
     config = configparser.RawConfigParser()
-    config.optionxform = str
+    config.optionxform = _preserve_option_key
     return config
 
 
@@ -156,6 +160,14 @@ def _generate_baseurl_config(
 
 def set_baseurl(repo_group: RepoGroup, urls: list[AnyUrl]) -> Path:
     config = _generate_baseurl_config(repo_group, urls)
+    return _merge_and_write(repo_group, config)
+
+
+def set_official_only(repo_group: RepoGroup) -> Path:
+    config = _generate_baseurl_config(
+        repo_group,
+        list(repo_group.official_base_urls),
+    )
     return _merge_and_write(repo_group, config)
 
 

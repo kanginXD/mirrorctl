@@ -3,6 +3,7 @@ from mirrorctl.types import RepoData, RepoGroup
 FEDORA_REPO_GROUP = RepoGroup(
     group_name="fedora",
     metalink_base_url="https://mirrors.fedoraproject.org",
+    official_base_urls=["https://dl.fedoraproject.org/pub/fedora/linux"],
     repo_data_list=[
         # These are patent-licensed repos, not mirrored to any mirror
         # The metalink sever always returns the same server, so we don't need to set it

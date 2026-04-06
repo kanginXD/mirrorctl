@@ -10,7 +10,16 @@ class RepoData(BaseModel):
 class RepoGroup(BaseModel):
     group_name: str
     metalink_base_url: AnyUrl
+    official_base_urls: list[AnyUrl]
     repo_data_list: list[RepoData]
+
+    @field_validator("official_base_urls")
+    @classmethod
+    def check_official_base_urls(cls, v: list[AnyUrl]) -> list[AnyUrl]:
+        if len(v) == 0:
+            raise ValueError("official_base_urls must not be empty")
+
+        return v
 
     @field_validator("repo_data_list")
     @classmethod

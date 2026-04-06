@@ -9,7 +9,8 @@ from mirrorctl.types import RepoData, RepoGroup
 def sample_repo_group() -> RepoGroup:
     return RepoGroup(
         group_name="test-group",
-        metalink_base_url="https://mirrors.example.com",
+        metalink_base_url="https://mirrors.fedoraproject.org",
+        official_base_urls=["https://dl.fedoraproject.org/pub/fedora/linux"],
         repo_data_list=[
             RepoData(
                 repo_id="test-updates",

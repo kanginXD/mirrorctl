@@ -3,6 +3,7 @@ from mirrorctl.types import RepoData, RepoGroup
 RPMFUSION_NONFREE_REPO_GROUP = RepoGroup(
     group_name="rpmfusion-nonfree",
     metalink_base_url="https://mirrors.rpmfusion.org",
+    official_base_urls=["https://download1.rpmfusion.org"],
     repo_data_list=[
         RepoData(
             repo_id="rpmfusion-nonfree-updates-testing",

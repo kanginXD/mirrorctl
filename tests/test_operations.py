@@ -1,5 +1,4 @@
 import configparser
-from unittest.mock import patch
 
 import pytest
 from pydantic import AnyUrl
@@ -9,6 +8,7 @@ from mirrorctl.operations import (
     metalink_builder,
     set_baseurl,
     set_metalink,
+    set_official_only,
     unset_all_mirrors,
 )
 from mirrorctl.types import RepoData, RepoGroup
@@ -18,7 +18,7 @@ class TestMetalinkBuilder:
     def test_basic(self):
         url = str(
             metalink_builder(
-                AnyUrl("https://mirrors.example.com"),
+                AnyUrl("https://mirrors.fedoraproject.org"),
                 "updates-released-f43",
             )
         )
@@ -30,17 +30,17 @@ class TestMetalinkBuilder:
     def test_with_country(self):
         url = str(
             metalink_builder(
-                AnyUrl("https://mirrors.example.com"),
+                AnyUrl("https://mirrors.fedoraproject.org"),
                 "updates-released-f43",
-                country=["KR", "JP"],
+                country=["KR", "US"],
             )
         )
-        assert "country=KR,JP" in url
+        assert "country=KR,US" in url
 
     def test_with_protocol(self):
         url = str(
             metalink_builder(
-                AnyUrl("https://mirrors.example.com"),
+                AnyUrl("https://mirrors.fedoraproject.org"),
                 "updates-released-f43",
                 protocol=["https", "http"],
             )
@@ -50,13 +50,13 @@ class TestMetalinkBuilder:
     def test_with_country_and_protocol(self):
         url = str(
             metalink_builder(
-                AnyUrl("https://mirrors.example.com"),
+                AnyUrl("https://mirrors.fedoraproject.org"),
                 "updates-released-f43",
-                country=["KR"],
+                country=["US"],
                 protocol=["https"],
             )
         )
-        assert "country=KR" in url
+        assert "country=US" in url
         assert "protocol=https" in url
 
 
@@ -68,11 +68,11 @@ class TestBuildFullBaseurlList:
             baseurl_path="/updates/43/x86_64/",
         )
         result = build_full_baseurl_list(
-            repo_data, [AnyUrl("https://mirror.example.com")]
+            repo_data, [AnyUrl("https://dl.fedoraproject.org/pub/fedora/linux")]
         )
         assert len(result) == 1
         assert str(result[0]) == (
-            "https://mirror.example.com/updates/43/x86_64/"
+            "https://dl.fedoraproject.org/pub/fedora/linux/updates/43/x86_64/"
         )
 
     def test_multiple_urls(self):
@@ -84,13 +84,15 @@ class TestBuildFullBaseurlList:
         result = build_full_baseurl_list(
             repo_data,
             [
-                AnyUrl("https://mirror1.example.com"),
-                AnyUrl("https://mirror2.example.com"),
+                AnyUrl("https://dl.fedoraproject.org/pub/fedora/linux"),
+                AnyUrl("https://download-ib01.fedoraproject.org/pub/fedora/linux"),
             ],
         )
         assert len(result) == 2
-        assert str(result[0]) == "https://mirror1.example.com/path/"
-        assert str(result[1]) == "https://mirror2.example.com/path/"
+        assert str(result[0]) == ("https://dl.fedoraproject.org/pub/fedora/linux/path/")
+        assert str(result[1]) == (
+            "https://download-ib01.fedoraproject.org/pub/fedora/linux/path/"
+        )
 
     def test_trailing_slash_deduped(self):
         repo_data = RepoData(
@@ -99,9 +101,9 @@ class TestBuildFullBaseurlList:
             baseurl_path="/path/",
         )
         result = build_full_baseurl_list(
-            repo_data, [AnyUrl("https://mirror.example.com/")]
+            repo_data, [AnyUrl("https://dl.fedoraproject.org/pub/fedora/linux/")]
         )
-        assert str(result[0]) == "https://mirror.example.com/path/"
+        assert str(result[0]) == ("https://dl.fedoraproject.org/pub/fedora/linux/path/")
 
     def test_empty_urls_raises(self):
         repo_data = RepoData(
@@ -140,7 +142,7 @@ class TestSetMetalink:
 
 class TestSetBaseurl:
     def test_writes_file(self, sample_repo_group, override_file):
-        urls = [AnyUrl("https://mirror.example.com/pub/fedora/linux")]
+        urls = [AnyUrl("https://dl.fedoraproject.org/pub/fedora/linux")]
         result = set_baseurl(sample_repo_group, urls)
 
         assert result == override_file
@@ -151,13 +153,13 @@ class TestSetBaseurl:
 
         assert config.has_section("test-updates")
         baseurl = config.get("test-updates", "baseurl")
-        assert "mirror.example.com" in baseurl
+        assert "dl.fedoraproject.org" in baseurl
         assert config.get("test-updates", "metalink") == ""
 
     def test_multiple_baseurls(self, sample_repo_group, override_file):
         urls = [
-            AnyUrl("https://mirror1.example.com/pub/fedora/linux"),
-            AnyUrl("https://mirror2.example.com/pub/fedora/linux"),
+            AnyUrl("https://dl.fedoraproject.org/pub/fedora/linux"),
+            AnyUrl("https://download-ib01.fedoraproject.org/pub/fedora/linux"),
         ]
         set_baseurl(sample_repo_group, urls)
 
@@ -165,15 +167,55 @@ class TestSetBaseurl:
         config.read(override_file)
 
         baseurl = config.get("test-updates", "baseurl")
-        assert "mirror1.example.com" in baseurl
-        assert "mirror2.example.com" in baseurl
+        assert "dl.fedoraproject.org" in baseurl
+        assert "download-ib01.fedoraproject.org" in baseurl
+
+
+class TestSetOfficialOnly:
+    def test_uses_official_base_urls(self, sample_repo_group, override_file):
+        set_official_only(sample_repo_group)
+
+        config = configparser.RawConfigParser()
+        config.read(override_file)
+
+        baseurl = config.get("test-updates", "baseurl")
+        assert "dl.fedoraproject.org" in baseurl
+        assert "/updates/$releasever/Everything/$basearch/" in baseurl
+        assert config.get("test-updates", "metalink") == ""
+
+    def test_multiple_official_roots(self, override_file):
+        group = RepoGroup(
+            group_name="multi",
+            metalink_base_url="https://mirrors.fedoraproject.org",
+            official_base_urls=[
+                AnyUrl("https://dl.fedoraproject.org/pub/fedora/linux"),
+                AnyUrl("https://download-ib01.fedoraproject.org/pub/fedora/linux"),
+            ],
+            repo_data_list=[
+                RepoData(
+                    repo_id="r1",
+                    metalink_repo_id="r1",
+                    baseurl_path="/updates/$releasever/Everything/$basearch/",
+                ),
+            ],
+        )
+
+        set_official_only(group)
+
+        config = configparser.RawConfigParser()
+        config.read(override_file)
+
+        baseurl = config.get("r1", "baseurl")
+        assert "dl.fedoraproject.org" in baseurl
+        assert "download-ib01.fedoraproject.org" in baseurl
 
 
 class TestMerge:
     def test_different_groups_preserved(self, override_file):
         group_a = RepoGroup(
             group_name="group-a",
-            metalink_base_url="https://mirrors.example.com",
+            metalink_base_url="https://mirrors.fedoraproject.org",
+            official_base_urls=["https://dl.fedoraproject.org/pub/fedora/linux"],
             repo_data_list=[
                 RepoData(
                     repo_id="repo-a",
@@ -184,7 +226,8 @@ class TestMerge:
         )
         group_b = RepoGroup(
             group_name="group-b",
-            metalink_base_url="https://mirrors.example.com",
+            metalink_base_url="https://mirrors.fedoraproject.org",
+            official_base_urls=["https://dl.fedoraproject.org/pub/fedora/linux"],
             repo_data_list=[
                 RepoData(
                     repo_id="repo-b",
@@ -208,7 +251,8 @@ class TestMerge:
     def test_same_group_replaced(self, override_file):
         group = RepoGroup(
             group_name="test",
-            metalink_base_url="https://mirrors.example.com",
+            metalink_base_url="https://mirrors.fedoraproject.org",
+            official_base_urls=["https://dl.fedoraproject.org/pub/fedora/linux"],
             repo_data_list=[
                 RepoData(
                     repo_id="repo-x",
@@ -230,9 +274,7 @@ class TestMerge:
 
 
 class TestUnsetAllMirrors:
-    def test_writes_empty_baseurl_and_metalink(
-        self, sample_repo_group, override_file
-    ):
+    def test_writes_empty_baseurl_and_metalink(self, sample_repo_group, override_file):
         result = unset_all_mirrors([sample_repo_group])
 
         assert result == override_file
@@ -257,7 +299,8 @@ class TestUnsetAllMirrors:
     def test_deduplicates_repo_id(self, override_file):
         dup_group_a = RepoGroup(
             group_name="a",
-            metalink_base_url="https://mirrors.example.com",
+            metalink_base_url="https://mirrors.fedoraproject.org",
+            official_base_urls=["https://dl.fedoraproject.org/pub/fedora/linux"],
             repo_data_list=[
                 RepoData(
                     repo_id="dup",
@@ -268,7 +311,8 @@ class TestUnsetAllMirrors:
         )
         dup_group_b = RepoGroup(
             group_name="b",
-            metalink_base_url="https://mirrors.example.com",
+            metalink_base_url="https://mirrors.fedoraproject.org",
+            official_base_urls=["https://dl.fedoraproject.org/pub/fedora/linux"],
             repo_data_list=[
                 RepoData(
                     repo_id="dup",

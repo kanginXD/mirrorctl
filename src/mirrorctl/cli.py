@@ -1,5 +1,5 @@
 import re
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from textwrap import dedent
 from typing import Annotated, NoReturn
@@ -13,7 +13,12 @@ from pydantic import AnyUrl
 from mirrorctl.data.fedora import FEDORA_REPO_GROUP
 from mirrorctl.data.rpmfusion_free import RPMFUSION_FREE_REPO_GROUP
 from mirrorctl.data.rpmfusion_nonfree import RPMFUSION_NONFREE_REPO_GROUP
-from mirrorctl.operations import set_baseurl, set_metalink, unset_all_mirrors
+from mirrorctl.operations import (
+    set_baseurl,
+    set_metalink,
+    set_official_only,
+    unset_all_mirrors,
+)
 from mirrorctl.types import RepoGroup
 from mirrorctl.validation import validate_country_mirrors
 
@@ -28,7 +33,7 @@ _DISTRO_REPO_MAP: dict[str, RepoGroup] = {
 }
 
 
-class ExternalGroup(str, Enum):
+class ExternalGroup(StrEnum):
     RPMFUSION_FREE = "rpmfusion-free"
     RPMFUSION_NONFREE = "rpmfusion-nonfree"
 
@@ -166,6 +171,27 @@ def pin_mirrors(
 
     repo_group = get_repo_group(group=group)
     override_file = set_baseurl(repo_group, urls)
+    _print_success_message(override_file)
+
+
+@app.command(
+    "official-only",
+    help=(
+        "Pin repos to the distributor's official download URLs only; "
+        "metalink is cleared so mirror pools are not used."
+    ),
+)
+def official_only(
+    group: Annotated[
+        ExternalGroup | None,
+        typer.Option(
+            help="Repository group to apply changes to. "
+            "If not provided, defaults to system's repo group",
+        ),
+    ] = None,
+) -> None:
+    repo_group = get_repo_group(group=group)
+    override_file = set_official_only(repo_group)
     _print_success_message(override_file)
 
 

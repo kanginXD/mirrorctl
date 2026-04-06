@@ -1,7 +1,8 @@
 import re
 from enum import Enum
+from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, Callable
+from typing import Annotated
 
 import click
 import distro
@@ -14,7 +15,6 @@ from mirrorctl.data.rpmfusion_free import RPMFUSION_FREE_REPO_GROUP
 from mirrorctl.data.rpmfusion_nonfree import RPMFUSION_NONFREE_REPO_GROUP
 from mirrorctl.operations import set_baseurl, set_metalink
 from mirrorctl.types import RepoGroup
-from mirrorctl.utils import is_rpm_free_installed, is_rpm_nonfree_installed
 
 _DISTRO_REPO_MAP: dict[str, RepoGroup] = {
     "fedora": FEDORA_REPO_GROUP,
@@ -26,12 +26,9 @@ class ExternalGroup(str, Enum):
     RPMFUSION_NONFREE = "rpmfusion-nonfree"
 
 
-_EXTERNAL_GROUP_REPO_MAP: dict[ExternalGroup, tuple[RepoGroup, Callable[[], bool]]] = {
-    ExternalGroup.RPMFUSION_FREE: (RPMFUSION_FREE_REPO_GROUP, is_rpm_free_installed),
-    ExternalGroup.RPMFUSION_NONFREE: (
-        RPMFUSION_NONFREE_REPO_GROUP,
-        is_rpm_nonfree_installed,
-    ),
+_EXTERNAL_GROUP_REPO_MAP: dict[ExternalGroup, RepoGroup] = {
+    ExternalGroup.RPMFUSION_FREE: RPMFUSION_FREE_REPO_GROUP,
+    ExternalGroup.RPMFUSION_NONFREE: RPMFUSION_NONFREE_REPO_GROUP,
 }
 
 
@@ -55,12 +52,7 @@ def get_repo_group(
     if group not in _EXTERNAL_GROUP_REPO_MAP:
         _exit_with_error(f"Unknown group: {group}")
 
-    repo_group, check_func = _EXTERNAL_GROUP_REPO_MAP[ExternalGroup(group)]
-    if not check_func():
-        # TODO: better error message
-        _exit_with_error("rpmfusion is not installed.")
-
-    return repo_group
+    return _EXTERNAL_GROUP_REPO_MAP[ExternalGroup(group)]
 
 
 app = typer.Typer(help="Manage repository mirrors", no_args_is_help=True)
@@ -123,12 +115,12 @@ def auto_mirrors(
     ] = None,
 ) -> None:
     repo_group = get_repo_group(group=group)
-    set_metalink(
+    override_file = set_metalink(
         repo_group,
         country=country,
         protocol=protocol,
     )
-    _print_success_message()
+    _print_success_message(override_file)
 
 
 @app.command("pin-mirrors", help="Pin mirrors for repositories")
@@ -157,18 +149,18 @@ def pin_mirrors(
         )
 
     repo_group = get_repo_group(group=group)
-    set_baseurl(repo_group, urls)
-    _print_success_message()
+    override_file = set_baseurl(repo_group, urls)
+    _print_success_message(override_file)
 
 
-def _print_success_message() -> None:
+def _print_success_message(override_file: Path) -> None:
     print(
-        dedent("""
+        dedent(f"""
         --------------------------
         Changes made successfully!
 
         Steps you must take:
-        1. Check config at /etc/dnf/repos.override.d/99-config_manager.repo
+        1. Check config at {override_file}
         2. Apply config by running `dnf clean all && dnf repo info --all`
         """)
     )

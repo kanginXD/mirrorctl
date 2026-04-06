@@ -10,6 +10,7 @@ class RepoData(BaseModel):
 
 
 class RepoGroup(BaseModel):
+    group_name: str
     metalink_base_url: AnyUrl
     repo_data_list: list[RepoData]
 

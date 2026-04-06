@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.debugpy",
+    "redhat.vscode-yaml",
+    "esbenp.prettier-vscode",
+    "charliermarsh.ruff",
+    "meta.pyrefly"
+  ]
+}

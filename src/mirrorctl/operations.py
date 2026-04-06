@@ -1,10 +1,49 @@
-import subprocess
-import sys
+import configparser
+from pathlib import Path
 
 from pydantic import AnyUrl
 
 from mirrorctl.types import RepoData, RepoGroup
 from mirrorctl.utils import join_url
+
+OVERRIDE_DIR = Path("/etc/dnf/repos.override.d")
+OVERRIDE_FILE = OVERRIDE_DIR / "100-mirrorctl.repo"
+
+
+def _new_repo_config() -> configparser.RawConfigParser:
+    config = configparser.RawConfigParser()
+    config.optionxform = str
+    return config
+
+
+def _read_existing_config() -> configparser.RawConfigParser:
+    config = _new_repo_config()
+    if OVERRIDE_FILE.exists():
+        config.read(OVERRIDE_FILE)
+
+    return config
+
+
+def _merge_and_write(
+    repo_group: RepoGroup,
+    new_config: configparser.RawConfigParser,
+) -> Path:
+    merged = _read_existing_config()
+
+    for repo_data in repo_group.repo_data_list:
+        if merged.has_section(repo_data.repo_id):
+            merged.remove_section(repo_data.repo_id)
+
+    for section in new_config.sections():
+        merged.add_section(section)
+        for key, value in new_config.items(section):
+            merged.set(section, key, value)
+
+    OVERRIDE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with OVERRIDE_FILE.open("w") as f:
+        merged.write(f, space_around_delimiters=False)
+
+    return OVERRIDE_FILE
 
 
 def metalink_builder(
@@ -19,10 +58,13 @@ def metalink_builder(
     }
     if country:
         query_params["country"] = ",".join(country)
+
     if protocol:
         query_params["protocol"] = ",".join(protocol)
 
-    query_string = "&".join([f"{key}={value}" for key, value in query_params.items()])
+    query_string = "&".join(
+        [f"{key}={value}" for key, value in query_params.items()]
+    )
 
     return join_url(metalink_base, f"/metalink?{query_string}")
 
@@ -36,74 +78,21 @@ def build_full_baseurl_list(
     full_baseurl_list: list[AnyUrl] = []
 
     for url in mirror_urls:
-        full_baseurl = AnyUrl(str(url).removesuffix("/") + repo_data.baseurl_path)
+        full_baseurl = AnyUrl(
+            str(url).removesuffix("/") + repo_data.baseurl_path
+        )
         full_baseurl_list.append(full_baseurl)
 
     return full_baseurl_list
 
 
-def format_baseurl_list(baseurl_list: list[AnyUrl]) -> str:
-    """
-    Format baseurl list for DNF config-manager.
-
-    Desired final output in `99-config_manager.repo`:
-        ```
-        baseurl=https://dl.fedoraproject.org/pub/fedora/linux
-            https://dl.fedoraproject.org/pub/fedora/linux
-            https://dl.fedoraproject.org/pub/fedora/linux
-        ```
-    """
-    if len(baseurl_list) == 0:
-        raise ValueError("`baseurl_list` is empty")
-
-    formatted_lines = [str(baseurl_list[0])]
-
-    for baseurl in baseurl_list[1:]:
-        formatted_lines.append(f"\t{baseurl}")
-
-    return "\n".join(formatted_lines)
-
-
-def run_dnf_config_manager(command: str) -> None:
-    full_command = f"dnf config-manager {command}"
-
-    try:
-        subprocess.run(
-            full_command,
-            shell=True,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as e:
-        print(e.stderr, file=sys.stderr)
-        sys.exit(1)
-
-
-def set_baseurl(repo_group: RepoGroup, urls: list[AnyUrl]) -> None:
-    # Disable metalink
-    for repo_data in repo_group.repo_data_list:
-        run_dnf_config_manager(f"setopt {repo_data.repo_id}.metalink=''")
-
-    # Enable baseurl
-    for repo_data in repo_group.repo_data_list:
-        full_baseurls = build_full_baseurl_list(repo_data, urls)
-        formatted_baseurls = format_baseurl_list(full_baseurls)
-        run_dnf_config_manager(
-            f"setopt {repo_data.repo_id}.baseurl='{formatted_baseurls}'"
-        )
-
-
-def set_metalink(
+def _generate_metalink_config(
     repo_group: RepoGroup,
     country: list[str] | None = None,
     protocol: list[str] | None = None,
-) -> None:
-    # Disable baseurl
-    for repo_data in repo_group.repo_data_list:
-        run_dnf_config_manager(f"setopt {repo_data.repo_id}.baseurl=''")
+) -> configparser.RawConfigParser:
+    config = _new_repo_config()
 
-    # Enable metalink
     for repo_data in repo_group.repo_data_list:
         metalink_url = metalink_builder(
             metalink_base=repo_group.metalink_base_url,
@@ -111,4 +100,41 @@ def set_metalink(
             country=country,
             protocol=protocol,
         )
-        run_dnf_config_manager(f"setopt {repo_data.repo_id}.metalink='{metalink_url}'")
+        config.add_section(repo_data.repo_id)
+        config.set(repo_data.repo_id, "metalink", str(metalink_url))
+        config.set(repo_data.repo_id, "baseurl", "")
+
+    return config
+
+
+def _generate_baseurl_config(
+    repo_group: RepoGroup,
+    urls: list[AnyUrl],
+) -> configparser.RawConfigParser:
+    config = _new_repo_config()
+
+    for repo_data in repo_group.repo_data_list:
+        full_baseurls = build_full_baseurl_list(repo_data, urls)
+        baseurl_value = "\n".join(str(url) for url in full_baseurls)
+
+        config.add_section(repo_data.repo_id)
+        config.set(repo_data.repo_id, "baseurl", baseurl_value)
+        config.set(repo_data.repo_id, "metalink", "")
+
+    return config
+
+
+def set_baseurl(repo_group: RepoGroup, urls: list[AnyUrl]) -> Path:
+    config = _generate_baseurl_config(repo_group, urls)
+    return _merge_and_write(repo_group, config)
+
+
+def set_metalink(
+    repo_group: RepoGroup,
+    country: list[str] | None = None,
+    protocol: list[str] | None = None,
+) -> Path:
+    config = _generate_metalink_config(
+        repo_group, country=country, protocol=protocol
+    )
+    return _merge_and_write(repo_group, config)

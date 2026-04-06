@@ -1,5 +1,5 @@
 {
-	"name": "dnf-config-mirror dev container",
+	"name": "mirrorctl dev container",
 	"build": {
 		"dockerfile": "./Containerfile",
 		"context": "..",
@@ -20,5 +20,5 @@
 		}
 	},
 	"postCreateCommand": "uv sync --link-mode=copy",
-    "postStartCommand": "uv run pre-commit install"
+	"postStartCommand": "uv run pre-commit install"
 }
